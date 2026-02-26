@@ -1,0 +1,55 @@
+{
+  "name": "dtc-mcp",
+  "version": "0.1.0",
+  "description": "Context-optimized MCP server for DTC e-commerce brands (Klaviyo + Shopify). 80% less context usage than raw API wrappers.",
+  "type": "module",
+  "bin": {
+    "dtc-mcp": "dist/index.js"
+  },
+  "main": "./dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "start": "node dist/index.js",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "inspect": "npx @modelcontextprotocol/inspector dist/index.js"
+  },
+  "keywords": [
+    "mcp",
+    "klaviyo",
+    "shopify",
+    "dtc",
+    "ecommerce",
+    "analytics",
+    "context-optimized"
+  ],
+  "author": "Rafael Sztutman",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/rafaelsztutman/dtc-mcp.git"
+  },
+  "homepage": "https://github.com/rafaelsztutman/dtc-mcp#readme",
+  "bugs": {
+    "url": "https://github.com/rafaelsztutman/dtc-mcp/issues"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.27.0",
+    "dotenv": "^17.3.1",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "typescript": "^5.5.0",
+    "vitest": "^2.0.0"
+  }
+}

@@ -1,0 +1,15 @@
+{
+  "mcpServers": {
+    "dtc-mcp": {
+      "command": "node",
+      "args": ["${CLAUDE_PLUGIN_ROOT}/dist/index.js"],
+      "env": {
+        "KLAVIYO_API_KEY": "${KLAVIYO_API_KEY}",
+        "SHOPIFY_STORE": "${SHOPIFY_STORE:-}",
+        "SHOPIFY_CLIENT_ID": "${SHOPIFY_CLIENT_ID:-}",
+        "SHOPIFY_CLIENT_SECRET": "${SHOPIFY_CLIENT_SECRET:-}",
+        "SHOPIFY_ACCESS_TOKEN": "${SHOPIFY_ACCESS_TOKEN:-}"
+      }
+    }
+  }
+}

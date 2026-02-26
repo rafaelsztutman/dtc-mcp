@@ -1,0 +1,88 @@
+{
+  "flows": [
+    {
+      "id": "flow_001",
+      "attributes": {
+        "name": "Welcome Series",
+        "status": "live",
+        "trigger_type": "List",
+        "archived": false
+      },
+      "messageCount": 4
+    },
+    {
+      "id": "flow_002",
+      "attributes": {
+        "name": "Abandoned Cart",
+        "status": "live",
+        "trigger_type": "Metric",
+        "archived": false
+      },
+      "messageCount": 3
+    },
+    {
+      "id": "flow_003",
+      "attributes": {
+        "name": "Post-Purchase",
+        "status": "live",
+        "trigger_type": "Metric",
+        "archived": false
+      },
+      "messageCount": 2
+    }
+  ],
+  "report_rows": [
+    {
+      "groupings": { "flow_id": "flow_001", "flow_message_id": "msg_001a", "send_channel": "email" },
+      "statistics": {
+        "recipients": 8000,
+        "opens": 4800,
+        "opens_unique": 4400,
+        "clicks": 1200,
+        "clicks_unique": 1000,
+        "conversion_value": 6500.00,
+        "conversions": 65
+      }
+    },
+    {
+      "groupings": { "flow_id": "flow_001", "flow_message_id": "msg_001b", "send_channel": "email" },
+      "statistics": {
+        "recipients": 6000,
+        "opens": 3000,
+        "opens_unique": 2700,
+        "clicks": 600,
+        "clicks_unique": 480,
+        "conversion_value": 3200.00,
+        "conversions": 32
+      }
+    },
+    {
+      "groupings": { "flow_id": "flow_002", "flow_message_id": "msg_002a", "send_channel": "email" },
+      "statistics": {
+        "recipients": 12000,
+        "opens": 7200,
+        "opens_unique": 6600,
+        "clicks": 3600,
+        "clicks_unique": 3000,
+        "conversion_value": 45000.00,
+        "conversions": 450
+      }
+    },
+    {
+      "groupings": { "flow_id": "flow_003", "flow_message_id": "msg_003a", "send_channel": "email" },
+      "statistics": {
+        "recipients": 10000,
+        "opens": 5000,
+        "opens_unique": 4500,
+        "clicks": 2000,
+        "clicks_unique": 1700,
+        "conversion_value": 8000.00,
+        "conversions": 80
+      }
+    }
+  ],
+  "flow_messages": [
+    { "id": "msg_001a", "attributes": { "name": "Welcome Email 1", "subject": "Welcome to the family!", "status": "live" } },
+    { "id": "msg_001b", "attributes": { "name": "Welcome Email 2", "subject": "Here's 10% off your first order", "status": "live" } }
+  ]
+}

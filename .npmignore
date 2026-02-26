@@ -1,0 +1,13 @@
+src/
+tests/
+.env
+.env.example
+tsconfig.json
+CLAUDE.md
+TESTING_AND_PUBLISHING.md
+.claude/
+.claude-plugin/
+.mcp.json
+skills/
+commands/
+.github/

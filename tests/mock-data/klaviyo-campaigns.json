@@ -1,0 +1,123 @@
+{
+  "campaigns": [
+    {
+      "id": "camp_001",
+      "attributes": {
+        "name": "Summer Sale 2025",
+        "status": "Sent",
+        "archived": false,
+        "send_options": { "use_smart_sending": true },
+        "scheduled_at": null,
+        "send_time": "2025-07-15T10:00:00Z"
+      }
+    },
+    {
+      "id": "camp_002",
+      "attributes": {
+        "name": "New Arrivals July",
+        "status": "Sent",
+        "archived": false,
+        "send_options": { "use_smart_sending": true },
+        "scheduled_at": null,
+        "send_time": "2025-07-20T14:00:00Z"
+      }
+    },
+    {
+      "id": "camp_003",
+      "attributes": {
+        "name": "Flash Sale SMS",
+        "status": "Sent",
+        "archived": false,
+        "send_options": { "use_smart_sending": true },
+        "scheduled_at": null,
+        "send_time": "2025-07-22T16:00:00Z"
+      }
+    },
+    {
+      "id": "camp_004",
+      "attributes": {
+        "name": "Draft Campaign",
+        "status": "Draft",
+        "archived": false,
+        "send_options": { "use_smart_sending": true },
+        "scheduled_at": null,
+        "send_time": null
+      }
+    }
+  ],
+  "report_rows": [
+    {
+      "groupings": { "campaign_id": "camp_001", "send_channel": "email" },
+      "statistics": {
+        "recipients": 15000,
+        "opens": 4500,
+        "opens_unique": 4200,
+        "clicks": 900,
+        "clicks_unique": 750,
+        "conversion_value": 12500.00,
+        "conversions": 125,
+        "unsubscribes": 30,
+        "bounced": 75,
+        "spam_complaints": 3
+      }
+    },
+    {
+      "groupings": { "campaign_id": "camp_002", "send_channel": "email" },
+      "statistics": {
+        "recipients": 12000,
+        "opens": 3000,
+        "opens_unique": 2800,
+        "clicks": 480,
+        "clicks_unique": 420,
+        "conversion_value": 8200.00,
+        "conversions": 82,
+        "unsubscribes": 60,
+        "bounced": 48,
+        "spam_complaints": 2
+      }
+    },
+    {
+      "groupings": { "campaign_id": "camp_003", "send_channel": "sms" },
+      "statistics": {
+        "recipients": 5000,
+        "opens": 0,
+        "opens_unique": 0,
+        "clicks": 250,
+        "clicks_unique": 200,
+        "conversion_value": 4800.00,
+        "conversions": 48,
+        "unsubscribes": 10,
+        "bounced": 0,
+        "spam_complaints": 0
+      }
+    }
+  ],
+  "detail_campaign": {
+    "id": "camp_001",
+    "attributes": {
+      "name": "Summer Sale 2025",
+      "status": "Sent",
+      "archived": false,
+      "send_options": { "use_smart_sending": true },
+      "scheduled_at": null,
+      "send_time": "2025-07-15T10:00:00Z",
+      "audiences": {
+        "included": [{ "id": "list_001" }],
+        "excluded": []
+      }
+    }
+  },
+  "detail_messages": [
+    {
+      "attributes": {
+        "definition": {
+          "channel": "email",
+          "label": "Summer Sale Email",
+          "content": {
+            "subject": "🌞 50% Off Everything — Summer Sale Starts Now!"
+          }
+        }
+      }
+    }
+  ]
+}
