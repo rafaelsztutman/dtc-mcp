@@ -9,3 +9,5 @@ dist/
 *.log
 *.swp
 *.swo
+*.mcpb
+.mcpb-staging/

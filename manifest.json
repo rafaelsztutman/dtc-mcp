@@ -1,0 +1,86 @@
+{
+  "manifest_version": "0.2",
+  "name": "dtc-mcp",
+  "display_name": "DTC E-Commerce Analytics",
+  "version": "0.1.2",
+  "description": "Connect Claude to your Klaviyo and Shopify data with 16 pre-built analytics tools. Context-optimized — uses ~80% less context than raw API wrappers.",
+  "author": {
+    "name": "Rafael Sztutman"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/rafaelsztutman/dtc-mcp"
+  },
+  "homepage": "https://github.com/rafaelsztutman/dtc-mcp#readme",
+  "keywords": ["klaviyo", "shopify", "dtc", "ecommerce", "analytics"],
+  "server": {
+    "type": "node",
+    "entry_point": "server/index.js",
+    "mcp_config": {
+      "command": "node",
+      "args": ["${__dirname}/server/index.js"],
+      "env": {
+        "KLAVIYO_API_KEY": "${user_config.klaviyo_api_key}",
+        "SHOPIFY_STORE": "${user_config.shopify_store}",
+        "SHOPIFY_CLIENT_ID": "${user_config.shopify_client_id}",
+        "SHOPIFY_CLIENT_SECRET": "${user_config.shopify_client_secret}",
+        "SHOPIFY_ACCESS_TOKEN": "${user_config.shopify_access_token}"
+      }
+    }
+  },
+  "user_config": {
+    "klaviyo_api_key": {
+      "title": "Klaviyo API Key",
+      "type": "string",
+      "description": "Your Klaviyo private API key (starts with pk_). Find it at Settings > Account > API Keys.",
+      "required": true,
+      "sensitive": true
+    },
+    "shopify_store": {
+      "title": "Shopify Store Domain",
+      "type": "string",
+      "description": "Your Shopify store domain (e.g., your-store.myshopify.com). Leave empty for Klaviyo-only mode.",
+      "required": false
+    },
+    "shopify_client_id": {
+      "title": "Shopify Client ID",
+      "type": "string",
+      "description": "App Client ID from the Shopify Partners Dashboard (for Dev Dashboard apps).",
+      "required": false
+    },
+    "shopify_client_secret": {
+      "title": "Shopify Client Secret",
+      "type": "string",
+      "description": "App Client Secret from the Shopify Partners Dashboard (starts with shpss_).",
+      "required": false,
+      "sensitive": true
+    },
+    "shopify_access_token": {
+      "title": "Shopify Access Token (Legacy)",
+      "type": "string",
+      "description": "Admin API access token for legacy custom apps (starts with shpat_). Use this OR Client ID/Secret, not both.",
+      "required": false,
+      "sensitive": true
+    }
+  },
+  "tools": [
+    { "name": "klaviyo_campaign_summary", "description": "Top campaigns ranked by metric" },
+    { "name": "klaviyo_campaign_detail", "description": "Deep dive on one campaign" },
+    { "name": "klaviyo_flow_summary", "description": "Top flows by metric" },
+    { "name": "klaviyo_flow_detail", "description": "Per-message flow breakdown" },
+    { "name": "klaviyo_subscriber_health", "description": "List growth and engagement" },
+    { "name": "klaviyo_list_segments", "description": "All lists and segments with sizes" },
+    { "name": "klaviyo_search_profiles", "description": "Find profiles by email/phone/name" },
+    { "name": "klaviyo_recent_activity", "description": "Recent events for a metric" },
+    { "name": "shopify_sales_summary", "description": "Revenue, orders, AOV with comparison" },
+    { "name": "shopify_sales_timeseries", "description": "Revenue by day/week/month" },
+    { "name": "shopify_product_performance", "description": "Top products by revenue or units" },
+    { "name": "shopify_order_search", "description": "Find orders by number/email/status" },
+    { "name": "shopify_inventory_alerts", "description": "Low and zero stock products" },
+    { "name": "shopify_customer_cohort", "description": "New vs returning buyer breakdown" },
+    { "name": "shopify_recent_orders", "description": "Most recent orders snapshot" },
+    { "name": "dtc_email_revenue_attribution", "description": "Email revenue vs total revenue" },
+    { "name": "dtc_dashboard", "description": "Full DTC health dashboard" }
+  ]
+}

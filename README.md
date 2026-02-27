@@ -27,6 +27,15 @@ npx dtc-mcp
 
 ## Setup with Claude Desktop
 
+### Option A: Desktop Extension (one-click install)
+
+1. Download the latest `dtc-mcp.mcpb` from [GitHub Releases](https://github.com/rafaelsztutman/dtc-mcp/releases)
+2. Double-click the `.mcpb` file — Claude Desktop will open an install dialog
+3. Enter your API credentials when prompted (Klaviyo key required, Shopify optional)
+4. The 16 tools will appear in the hammer menu automatically
+
+### Option B: Manual Configuration
+
 1. Open Claude Desktop
 2. Go to **Settings** (gear icon) > **Developer** > **Edit Config**
 3. Add the following to your `claude_desktop_config.json`:
