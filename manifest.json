@@ -2,7 +2,7 @@
   "manifest_version": "0.3",
   "name": "dtc-mcp",
   "display_name": "DTC E-Commerce Analytics",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "description": "Connect Claude to your Klaviyo and Shopify data with 16 pre-built analytics tools. Context-optimized — uses ~80% less context than raw API wrappers.",
   "author": {
     "name": "Rafael Sztutman"
