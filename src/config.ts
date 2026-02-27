@@ -35,7 +35,12 @@ function getRequired(name: string): string {
 }
 
 function getOptional(name: string): string | null {
-  return process.env[name] || null;
+  const raw = process.env[name];
+  if (!raw) return null;
+  // Claude Desktop may pass placeholder values for unfilled optional fields
+  const trimmed = raw.trim();
+  if (!trimmed || trimmed === "undefined" || trimmed === "null") return null;
+  return trimmed;
 }
 
 function loadConfig(): Config {
@@ -51,40 +56,43 @@ function loadConfig(): Config {
   const hasClientCredentials =
     shopifyClientId !== null && shopifyClientSecret !== null;
 
-  if (hasLegacy && hasClientCredentials) {
-    throw new Error(
-      "Ambiguous Shopify config: both SHOPIFY_ACCESS_TOKEN and SHOPIFY_CLIENT_ID/SHOPIFY_CLIENT_SECRET are set. Use one auth mode, not both.",
-    );
-  }
-
   let shopifyAuthMode: ShopifyAuthMode = null;
-  if (hasClientCredentials) {
+  if (hasLegacy && hasClientCredentials) {
+    // Both set — prefer client_credentials (recommended), ignore legacy token
+    console.error(
+      "[dtc-mcp] warn: Both SHOPIFY_ACCESS_TOKEN and SHOPIFY_CLIENT_ID/SECRET are set. Using Client Credentials (recommended). Remove ACCESS_TOKEN to silence this warning.",
+    );
+    shopifyAuthMode = "client_credentials";
+  } else if (hasClientCredentials) {
     shopifyAuthMode = "client_credentials";
   } else if (hasLegacy) {
     shopifyAuthMode = "legacy";
   }
 
-  // Validate that store is set when any auth is configured
+  // Warn (don't throw) if store is missing when auth is configured
   if (shopifyAuthMode && !shopifyStore) {
-    throw new Error(
-      "SHOPIFY_STORE is required when Shopify credentials are configured.",
+    console.error(
+      "[dtc-mcp] warn: Shopify credentials are set but SHOPIFY_STORE is missing. Shopify tools will be disabled.",
     );
+    shopifyAuthMode = null;
   }
 
-  // Validate partial client credentials
+  // Warn (don't throw) for partial client credentials
   if (
     (shopifyClientId && !shopifyClientSecret) ||
     (!shopifyClientId && shopifyClientSecret)
   ) {
-    throw new Error(
-      "Both SHOPIFY_CLIENT_ID and SHOPIFY_CLIENT_SECRET must be set together.",
+    console.error(
+      "[dtc-mcp] warn: Only one of SHOPIFY_CLIENT_ID/SHOPIFY_CLIENT_SECRET is set. Both are required. Shopify client credentials auth will be disabled.",
     );
   }
 
-  const logLevel = (process.env.LOG_LEVEL || "info") as LogLevel;
-  if (!["debug", "info", "warn", "error"].includes(logLevel)) {
-    throw new Error(
-      `Invalid LOG_LEVEL: ${logLevel}. Must be one of: debug, info, warn, error`,
+  const rawLogLevel = (process.env.LOG_LEVEL || "info") as LogLevel;
+  const validLevels: LogLevel[] = ["debug", "info", "warn", "error"];
+  const logLevel = validLevels.includes(rawLogLevel) ? rawLogLevel : "info";
+  if (!validLevels.includes(rawLogLevel)) {
+    console.error(
+      `[dtc-mcp] warn: Invalid LOG_LEVEL "${rawLogLevel}", defaulting to "info".`,
     );
   }
 
@@ -92,9 +100,11 @@ function loadConfig(): Config {
     klaviyoApiKey,
     klaviyoRevision: "2026-01-15",
     shopifyStore,
-    shopifyAccessToken,
-    shopifyClientId,
-    shopifyClientSecret,
+    shopifyAccessToken: shopifyAuthMode === "legacy" ? shopifyAccessToken : null,
+    shopifyClientId:
+      shopifyAuthMode === "client_credentials" ? shopifyClientId : null,
+    shopifyClientSecret:
+      shopifyAuthMode === "client_credentials" ? shopifyClientSecret : null,
     shopifyAuthMode,
     shopifyApiVersion: process.env.SHOPIFY_API_VERSION || "2026-01",
     klaviyoConversionMetricId: getOptional("KLAVIYO_CONVERSION_METRIC_ID"),
