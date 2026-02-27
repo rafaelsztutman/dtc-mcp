@@ -1,6 +1,6 @@
 {
   "name": "dtc-mcp",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "description": "Context-optimized MCP server for DTC e-commerce brands (Klaviyo + Shopify). 80% less context usage than raw API wrappers.",
   "type": "module",
   "bin": {
