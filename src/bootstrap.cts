@@ -32,8 +32,8 @@ debugLog(`cwd: ${process.cwd()}`);
 debugLog(
   `env KLAVIYO_API_KEY set: ${!!process.env.KLAVIYO_API_KEY} (length: ${process.env.KLAVIYO_API_KEY?.length ?? 0})`,
 );
-debugLog(`env SHOPIFY_STORE: "${process.env.SHOPIFY_STORE || ""}"`);
-debugLog(`env SHOPIFY_CLIENT_ID: "${process.env.SHOPIFY_CLIENT_ID || ""}"`);
+debugLog(`env SHOPIFY_STORE set: ${!!process.env.SHOPIFY_STORE}`);
+debugLog(`env SHOPIFY_CLIENT_ID set: ${!!process.env.SHOPIFY_CLIENT_ID}`);
 debugLog(
   `env SHOPIFY_CLIENT_SECRET set: ${!!process.env.SHOPIFY_CLIENT_SECRET}`,
 );
