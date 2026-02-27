@@ -23,10 +23,13 @@ export interface Config {
 function getRequired(name: string): string {
   const value = process.env[name];
   if (!value) {
-    throw new Error(
-      `Missing required environment variable: ${name}. ` +
-        `Set it in your environment: export ${name}=your_value_here`,
+    // Warn instead of throwing — allows the server to start and return
+    // actionable errors when tools are called without credentials
+    console.error(
+      `[dtc-mcp] warn: Missing environment variable: ${name}. ` +
+        `Tools requiring this key will return an error when called.`,
     );
+    return "";
   }
   return value;
 }
