@@ -1,5 +1,5 @@
 {
-  "manifest_version": "0.2",
+  "manifest_version": "0.3",
   "name": "dtc-mcp",
   "display_name": "DTC E-Commerce Analytics",
   "version": "0.1.2",
@@ -31,37 +31,44 @@
   },
   "user_config": {
     "klaviyo_api_key": {
-      "title": "Klaviyo API Key",
       "type": "string",
+      "title": "Klaviyo API Key",
       "description": "Your Klaviyo private API key (starts with pk_). Find it at Settings > Account > API Keys.",
-      "required": true,
-      "sensitive": true
+      "sensitive": true,
+      "required": true
     },
     "shopify_store": {
-      "title": "Shopify Store Domain",
       "type": "string",
+      "title": "Shopify Store Domain",
       "description": "Your Shopify store domain (e.g., your-store.myshopify.com). Leave empty for Klaviyo-only mode.",
       "required": false
     },
     "shopify_client_id": {
-      "title": "Shopify Client ID",
       "type": "string",
+      "title": "Shopify Client ID",
       "description": "App Client ID from the Shopify Partners Dashboard (for Dev Dashboard apps).",
       "required": false
     },
     "shopify_client_secret": {
-      "title": "Shopify Client Secret",
       "type": "string",
+      "title": "Shopify Client Secret",
       "description": "App Client Secret from the Shopify Partners Dashboard (starts with shpss_).",
-      "required": false,
-      "sensitive": true
+      "sensitive": true,
+      "required": false
     },
     "shopify_access_token": {
-      "title": "Shopify Access Token (Legacy)",
       "type": "string",
+      "title": "Shopify Access Token (Legacy)",
       "description": "Admin API access token for legacy custom apps (starts with shpat_). Use this OR Client ID/Secret, not both.",
-      "required": false,
-      "sensitive": true
+      "sensitive": true,
+      "required": false
+    }
+  },
+  "compatibility": {
+    "claude_desktop": ">=0.10.0",
+    "platforms": ["darwin", "win32"],
+    "runtimes": {
+      "node": ">=20.0.0"
     }
   },
   "tools": [
