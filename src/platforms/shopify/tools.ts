@@ -3,6 +3,7 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { isShopifyConfigured } from "../../config.js";
 import {
   shopifyQuery,
+  shopifyqlQuery,
   getAggregatedSales,
   getTimeSeriesSales,
   getStoreTimezone,
@@ -14,8 +15,13 @@ import {
   transformProductPerformance,
   transformOrders,
   transformInventoryAlerts,
-  transformCustomerCohort,
   transformRecentOrders,
+  transformCustomerCohorts,
+  transformCustomerSegments,
+  transformSalesBreakdown,
+  transformProductAnalytics,
+  transformTrafficSources,
+  transformReturnsAnalysis,
 } from "./transforms.js";
 import {
   formatError,
@@ -264,71 +270,191 @@ export function registerShopifyTools(server: McpServer): void {
     },
   );
 
-  // ---- Tool 13: Customer Cohort ----
+  // ---- Tool 13: Customer Cohorts (ShopifyQL) ----
   server.tool(
-    "shopify_customer_cohort",
-    "New vs returning buyers in the period. Shows first-time vs repeat split.",
+    "shopify_customer_cohorts",
+    "Monthly/quarterly acquisition cohorts with LTV and retention.",
     {
-      days: z.number().min(1).max(365).default(90),
-      limit: z
-        .number()
-        .min(1)
-        .max(500)
-        .default(250)
-        .describe("Max customers to analyze"),
+      granularity: z
+        .enum(["monthly", "quarterly"])
+        .default("monthly")
+        .describe("Cohort grouping"),
+      months: z.number().min(1).max(36).default(24),
     },
-    async ({ days, limit }) => {
+    async ({ granularity, months }) => {
       if (!isShopifyConfigured()) return shopifyNotConfigured();
 
       try {
-        const tz = await getStoreTimezone();
-        const sinceDate = new Date();
-        sinceDate.setDate(sinceDate.getDate() - days);
-        const sinceDateStr = sinceDate.toLocaleDateString("en-CA", { timeZone: tz });
+        const cohortKey = granularity === "monthly" ? "customer_cohort_month" : "customer_cohort_quarter";
+        // Fetch months+1 to buffer for partial oldest month, then trim it
+        const ql = `FROM customers SHOW new_customer_records, total_amount_spent, total_amount_spent_per_order, total_number_of_orders, days_since_last_order GROUP BY ${cohortKey} SINCE -${months + 1}m UNTIL today ORDER BY ${cohortKey} DESC`;
+        const result = await shopifyqlQuery(ql);
+        const rows = result.rows.length > 1 ? result.rows.slice(0, -1) : result.rows;
+        return toolResult(transformCustomerCohorts(rows, granularity, months));
+      } catch (error) {
+        return formatError(error);
+      }
+    },
+  );
 
-        const query = `
-          query($first: Int!, $after: String, $queryStr: String!) {
-            customers(first: $first, after: $after, query: $queryStr) {
-              nodes {
-                id
-                email
-                numberOfOrders
-                amountSpent { amount currencyCode }
-                createdAt
-              }
-              pageInfo { hasNextPage endCursor }
-            }
-          }
-        `;
+  // ---- Tool 13b: Customer Segments (ShopifyQL) ----
+  server.tool(
+    "shopify_customer_segments",
+    "Customer distribution by RFM, spend tier, country, or tags.",
+    {
+      dimension: z
+        .enum([
+          "rfm_group",
+          "predicted_spend_tier",
+          "customer_email_subscription_status",
+          "customer_sms_subscription_status",
+          "customer_country",
+          "customer_tag",
+          "customer_number_of_orders",
+        ])
+        .describe("Segmentation dimension"),
+      months: z.number().min(1).max(24).default(12),
+      limit: z.number().min(1).max(50).default(20),
+    },
+    async ({ dimension, months, limit }) => {
+      if (!isShopifyConfigured()) return shopifyNotConfigured();
 
-        const customers = await paginateGraphQL(
-          query,
-          {
-            first: Math.min(limit, 250),
-            queryStr: `last_order_date:>=${sinceDateStr}`,
-          },
-          (data) => {
-            const c = data.customers as {
-              nodes: unknown[];
-              pageInfo: { hasNextPage: boolean; endCursor?: string };
-            };
-            return { nodes: c.nodes, pageInfo: c.pageInfo };
-          },
-          Math.ceil(limit / 250),
-        );
+      try {
+        const ql = `FROM customers SHOW percent_of_customers, total_amount_spent, total_number_of_orders, new_customer_records GROUP BY ${dimension} SINCE -${months}m UNTIL today ORDER BY total_amount_spent DESC LIMIT ${limit}`;
+        const result = await shopifyqlQuery(ql);
+        return toolResult(transformCustomerSegments(result.rows, dimension, months));
+      } catch (error) {
+        return formatError(error);
+      }
+    },
+  );
 
-        const result = transformCustomerCohort(
-          customers as Array<{
-            id: string;
-            email?: string | null;
-            numberOfOrders: string;
-            amountSpent: { amount: string; currencyCode: string };
-            createdAt: string;
-          }>,
-          days,
-        );
+  // ---- Tool 13c: Sales Breakdown (ShopifyQL) ----
+  server.tool(
+    "shopify_sales_breakdown",
+    "Revenue/orders by country, channel, vendor, or traffic source.",
+    {
+      dimension: z
+        .enum([
+          "billing_country",
+          "billing_region",
+          "channel_name",
+          "product_vendor",
+          "referrer_source",
+          "referring_channel",
+          "referring_platform",
+          "traffic_type",
+          "shipping_country",
+        ])
+        .describe("Breakdown dimension"),
+      days: z.number().min(1).max(365).default(30),
+      metric: z
+        .enum(["total_sales", "net_sales", "orders", "average_order_value", "gross_profit"])
+        .default("net_sales"),
+      limit: z.number().min(1).max(50).default(10),
+    },
+    async ({ dimension, days, metric, limit }) => {
+      if (!isShopifyConfigured()) return shopifyNotConfigured();
 
-        return toolResult(result);
+      try {
+        const ql = `FROM sales SHOW ${metric}, orders GROUP BY ${dimension} SINCE -${days}d UNTIL today ORDER BY ${metric} DESC LIMIT ${limit}`;
+        const result = await shopifyqlQuery(ql);
+        return toolResult(transformSalesBreakdown(result.rows, dimension, metric, days));
+      } catch (error) {
+        return formatError(error);
+      }
+    },
+  );
+
+  // ---- Tool 13d: Product Analytics (ShopifyQL) ----
+  server.tool(
+    "shopify_product_analytics",
+    "Product performance with margins, returns, and quantities.",
+    {
+      days: z.number().min(1).max(365).default(30),
+      metric: z
+        .enum(["net_sales", "gross_sales", "orders", "gross_profit"])
+        .default("net_sales")
+        .describe("Sort products by this metric"),
+      limit: z.number().min(1).max(50).default(10),
+    },
+    async ({ days, metric, limit }) => {
+      if (!isShopifyConfigured()) return shopifyNotConfigured();
+
+      try {
+        const ql = `FROM sales SHOW net_sales, gross_sales, orders, gross_profit, quantity_ordered, returns GROUP BY product_title SINCE -${days}d UNTIL today ORDER BY ${metric} DESC LIMIT ${limit}`;
+        const result = await shopifyqlQuery(ql);
+        return toolResult(transformProductAnalytics(result.rows, days, metric));
+      } catch (error) {
+        return formatError(error);
+      }
+    },
+  );
+
+  // ---- Tool 13e: Traffic Sources (ShopifyQL) ----
+  server.tool(
+    "shopify_traffic_sources",
+    "Sessions by source, landing page, or daily trend.",
+    {
+      mode: z
+        .enum(["sources", "landing_pages", "trend"])
+        .default("sources")
+        .describe("Analysis mode"),
+      days: z.number().min(1).max(365).default(30),
+      limit: z.number().min(1).max(50).default(10),
+    },
+    async ({ mode, days, limit }) => {
+      if (!isShopifyConfigured()) return shopifyNotConfigured();
+
+      try {
+        let ql: string;
+        let sourceField: string;
+
+        if (mode === "sources") {
+          sourceField = "referrer_source";
+          ql = `FROM sessions SHOW sessions GROUP BY referrer_source SINCE -${days}d UNTIL today ORDER BY sessions DESC LIMIT ${limit}`;
+        } else if (mode === "landing_pages") {
+          sourceField = "session_landing_page";
+          ql = `FROM sessions SHOW sessions GROUP BY session_landing_page SINCE -${days}d UNTIL today ORDER BY sessions DESC LIMIT ${limit}`;
+        } else {
+          sourceField = "day";
+          ql = `FROM sessions SHOW sessions GROUP BY day SINCE -${days}d UNTIL today ORDER BY day ASC`;
+        }
+
+        const result = await shopifyqlQuery(ql);
+        return toolResult(transformTrafficSources(result.rows, mode, days, sourceField));
+      } catch (error) {
+        return formatError(error);
+      }
+    },
+  );
+
+  // ---- Tool 13f: Returns Analysis (ShopifyQL) ----
+  server.tool(
+    "shopify_returns_analysis",
+    "Return rates, costs, and most-returned products.",
+    {
+      mode: z
+        .enum(["summary", "by_product"])
+        .default("summary")
+        .describe("Summary totals or per-product breakdown"),
+      days: z.number().min(1).max(365).default(30),
+      limit: z.number().min(1).max(50).default(10),
+    },
+    async ({ mode, days, limit }) => {
+      if (!isShopifyConfigured()) return shopifyNotConfigured();
+
+      try {
+        let ql: string;
+
+        if (mode === "summary") {
+          ql = `FROM sales SHOW returns, total_returns, gross_returns, net_returns, quantity_returned, returned_quantity_rate, return_fees SINCE -${days}d UNTIL today`;
+        } else {
+          ql = `FROM sales SHOW returns, quantity_returned, net_sales, quantity_ordered GROUP BY product_title SINCE -${days}d UNTIL today ORDER BY returns ASC LIMIT ${limit}`;
+        }
+
+        const result = await shopifyqlQuery(ql);
+        return toolResult(transformReturnsAnalysis(result.rows, mode, days));
       } catch (error) {
         return formatError(error);
       }

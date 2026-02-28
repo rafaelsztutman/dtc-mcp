@@ -150,34 +150,30 @@ export function registerKlaviyoTools(server: McpServer): void {
       try {
         const params: Record<string, string> = {
           "fields[flow]": "name,status,trigger_type,archived",
+          "include": "flow-actions",
           "page[size]": "50",
         };
         if (status !== "all") {
           params.filter = `equals(status,'${status}')`;
         }
 
+        // Fetch flows with flow-actions included — avoids N+1 queries
         const flows = await klaviyoPaginateAll("flows", params);
 
         if (!flows.length) {
           return toolResult({ flows: [], message: "No flows found." });
         }
 
-        // Count messages per flow
-        const flowsWithCounts = await Promise.all(
-          flows.map(async (f) => {
-            try {
-              const actions = await klaviyoGet(`flows/${f.id}/flow-actions`, {
-                "fields[flow-action]": "created",
-              });
-              return {
-                ...f,
-                messageCount: actions.data?.length ?? 0,
-              };
-            } catch {
-              return { ...f, messageCount: 0 };
-            }
-          }),
-        );
+        // Count flow-actions per flow from relationship linkage data
+        const flowsWithCounts = flows.map((f) => {
+          const rel = f.relationships?.["flow-actions"] as
+            | { data?: Array<{ id: string }> }
+            | undefined;
+          return {
+            ...f,
+            messageCount: Array.isArray(rel?.data) ? rel.data.length : 0,
+          };
+        });
 
         // Fetch flow reporting (cached, reporting tier)
         // Don't pass flow IDs — avoids >100 ID limit on contains-any filter.

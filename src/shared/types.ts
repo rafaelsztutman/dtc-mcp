@@ -176,22 +176,98 @@ export interface InventoryAlertItem {
   inventory_quantity: number;
 }
 
-export interface CustomerCohort {
-  period_days: number;
-  total_customers: number;
-  new_customers: number;
-  returning_customers: number;
-  repeat_rate: number;
-  avg_orders_per_customer: number;
+export interface CustomerCohorts {
+  granularity: "monthly" | "quarterly";
+  months: number;
+  total_new_customers: number;
+  best_ltv_cohort: string | null;
+  trend: "improving" | "declining" | "stable";
+  ltv_benchmarks: {
+    avg_3m_ltv: number | null;
+    avg_6m_ltv: number | null;
+    avg_12m_ltv: number | null;
+  } | null;
   cohorts: Array<{
-    label: string;
-    count: number;
-    avg_spent: number;
+    cohort: string;
+    months_since_acquisition: number;
+    new_customers: number;
+    total_revenue: number;
+    avg_revenue_per_customer: number;
+    orders_per_customer: number;
+    avg_days_since_last_order: number;
   }>;
-  top_customers: Array<{
-    email: string | null;
+}
+
+export interface CustomerSegments {
+  dimension: string;
+  months: number;
+  total_customers: number;
+  segments: Array<{
+    segment: string;
+    pct_of_customers: number;
+    total_revenue: number;
+    total_orders: number;
+    customer_count: number;
+  }>;
+}
+
+export interface SalesBreakdown {
+  dimension: string;
+  metric: string;
+  days: number;
+  total: number;
+  rows: Array<{
+    dimension_value: string;
+    metric_value: number;
     orders: number;
-    total_spent: number;
+    pct_of_total: number;
+  }>;
+}
+
+export interface ProductAnalytics {
+  days: number;
+  metric: string;
+  products: Array<{
+    product_title: string;
+    net_sales: number;
+    gross_sales: number;
+    orders: number;
+    gross_profit: number;
+    margin_pct: number;
+    quantity_ordered: number;
+    returns: number;
+  }>;
+}
+
+export interface TrafficSources {
+  mode: string;
+  days: number;
+  total_sessions: number;
+  data: Array<{
+    source: string;
+    sessions: number;
+    pct_of_total: number;
+  }>;
+}
+
+export interface ReturnsAnalysis {
+  mode: string;
+  days: number;
+  summary?: {
+    returns: number;
+    total_returns: number;
+    gross_returns: number;
+    net_returns: number;
+    quantity_returned: number;
+    returned_quantity_rate: number;
+    return_fees: number;
+  };
+  by_product?: Array<{
+    product_title: string;
+    returns: number;
+    quantity_returned: number;
+    net_sales: number;
+    return_rate_pct: number;
   }>;
 }
 

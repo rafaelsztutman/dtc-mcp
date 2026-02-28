@@ -2,8 +2,8 @@
   "manifest_version": "0.3",
   "name": "dtc-mcp",
   "display_name": "DTC E-Commerce Analytics",
-  "version": "0.1.5",
-  "description": "Connect Claude to your Klaviyo and Shopify data with 16 pre-built analytics tools. Context-optimized — uses ~80% less context than raw API wrappers.",
+  "version": "0.2.0",
+  "description": "Connect Claude to your Klaviyo and Shopify data with 22 pre-built analytics tools. Context-optimized — uses ~80% less context than raw API wrappers.",
   "author": {
     "name": "Rafael Sztutman"
   },
@@ -85,7 +85,12 @@
     { "name": "shopify_product_performance", "description": "Top products by revenue or units" },
     { "name": "shopify_order_search", "description": "Find orders by number/email/status" },
     { "name": "shopify_inventory_alerts", "description": "Low and zero stock products" },
-    { "name": "shopify_customer_cohort", "description": "New vs returning buyer breakdown" },
+    { "name": "shopify_customer_cohorts", "description": "Monthly/quarterly acquisition cohorts with LTV" },
+    { "name": "shopify_customer_segments", "description": "Customer distribution by RFM, spend, country" },
+    { "name": "shopify_sales_breakdown", "description": "Revenue/orders by country, channel, vendor, source" },
+    { "name": "shopify_product_analytics", "description": "Product performance with margins and returns" },
+    { "name": "shopify_traffic_sources", "description": "Sessions by source, landing page, or trend" },
+    { "name": "shopify_returns_analysis", "description": "Return rates, costs, most-returned products" },
     { "name": "shopify_recent_orders", "description": "Most recent orders snapshot" },
     { "name": "dtc_email_revenue_attribution", "description": "Email revenue vs total revenue" },
     { "name": "dtc_dashboard", "description": "Full DTC health dashboard" }

@@ -11,3 +11,4 @@ dist/
 *.swo
 *.mcpb
 .mcpb-staging/
+scripts/

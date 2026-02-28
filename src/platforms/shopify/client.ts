@@ -218,7 +218,7 @@ export interface ShopifyQLColumn {
 
 export interface ShopifyQLResult {
   columns: ShopifyQLColumn[];
-  rows: string[][];
+  rows: Record<string, string>[];
 }
 
 /**
@@ -247,7 +247,7 @@ export async function shopifyqlQuery(ql: string): Promise<ShopifyQLResult> {
 
   const data = await shopifyQuery<{
     shopifyqlQuery: {
-      tableData?: { columns: ShopifyQLColumn[]; rows: string[][] };
+      tableData?: { columns: ShopifyQLColumn[]; rows: Record<string, string>[] };
       parseErrors?: string[];
     };
   }>(query, { query: ql }, 5);
@@ -310,25 +310,16 @@ export async function getAggregatedSales(
 
   // Try ShopifyQL first (fast, single API call, server-side aggregation)
   try {
-    const ql = `FROM orders SHOW sum(gross_sales) AS gross_revenue, sum(net_sales) AS net_revenue, count() AS order_count SINCE -${days}d UNTIL today WITH TIMEZONE ${tz}`;
+    const ql = `FROM sales SHOW gross_sales, net_sales, orders SINCE -${days}d UNTIL today`;
     const result = await shopifyqlQuery(ql);
     if (result.rows?.length) {
-      let grossRevenue = 0;
-      let netRevenue = 0;
-      let orderCount = 0;
-      for (let i = 0; i < result.columns.length; i++) {
-        const col = result.columns[i].name.toLowerCase();
-        if (col.includes("gross_revenue") || col.includes("gross_sales")) {
-          grossRevenue = parseFloat(result.rows[0][i]) || 0;
-        }
-        if (col.includes("net_revenue") || col.includes("net_sales")) {
-          netRevenue = parseFloat(result.rows[0][i]) || 0;
-        }
-        if (col.includes("order_count") || col.includes("count")) {
-          orderCount = parseInt(result.rows[0][i]) || 0;
-        }
-      }
-      return { grossRevenue, netRevenue, orderCount, source: "shopifyql" };
+      const row = result.rows[0];
+      return {
+        grossRevenue: parseFloat(row.gross_sales) || 0,
+        netRevenue: parseFloat(row.net_sales) || 0,
+        orderCount: parseInt(row.orders) || 0,
+        source: "shopifyql",
+      };
     }
   } catch (error) {
     log("debug", "ShopifyQL unavailable, falling back to GraphQL orders", {
@@ -414,31 +405,17 @@ export async function getTimeSeriesSales(
   // Try ShopifyQL first (server-side aggregation)
   try {
     const groupBy = SHOPIFYQL_GROUP[granularity];
-    const ql = `FROM orders SHOW sum(gross_sales) AS gross_revenue, sum(net_sales) AS net_revenue, count() AS order_count GROUP BY ${groupBy} SINCE -${days}d UNTIL today WITH TIMEZONE ${tz}`;
+    const ql = `FROM sales SHOW gross_sales, net_sales, orders GROUP BY ${groupBy} SINCE -${days}d UNTIL today ORDER BY ${groupBy} ASC`;
     const result = await shopifyqlQuery(ql);
 
     if (result.rows?.length) {
-      const dateIdx = result.columns.findIndex((c) =>
-        ["day", "week", "month"].includes(c.name.toLowerCase()),
-      );
-      const grossIdx = result.columns.findIndex((c) =>
-        c.name.toLowerCase().includes("gross_revenue") || c.name.toLowerCase().includes("gross_sales"),
-      );
-      const netIdx = result.columns.findIndex((c) =>
-        c.name.toLowerCase().includes("net_revenue") || c.name.toLowerCase().includes("net_sales"),
-      );
-      const countIdx = result.columns.findIndex((c) =>
-        c.name.toLowerCase().includes("order_count") || c.name.toLowerCase().includes("count"),
-      );
-
       const buckets: RawSalesBucket[] = result.rows.map((row) => ({
-        date: row[dateIdx] ?? "",
-        grossRevenue: parseFloat(row[grossIdx]) || 0,
-        netRevenue: parseFloat(row[netIdx]) || 0,
-        orderCount: parseInt(row[countIdx]) || 0,
+        date: row[groupBy] ?? "",
+        grossRevenue: parseFloat(row.gross_sales) || 0,
+        netRevenue: parseFloat(row.net_sales) || 0,
+        orderCount: parseInt(row.orders) || 0,
       }));
 
-      buckets.sort((a, b) => a.date.localeCompare(b.date));
       return { buckets, source: "shopifyql" };
     }
   } catch (error) {
