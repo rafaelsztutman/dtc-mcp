@@ -466,6 +466,10 @@ Here are questions you can ask Claude once dtc-mcp is connected:
 - "Compare this month's sales to last month"
 - "What are my top SMS campaigns by click rate?"
 
+## Privacy Policy
+
+dtc-mcp runs locally on your machine. It does not collect, store, or transmit any user data. API credentials are stored in your local MCP client configuration and used only to authenticate directly with Klaviyo and Shopify. No analytics, telemetry, or third-party data sharing. See [PRIVACY.md](PRIVACY.md) for full details.
+
 ## Development
 
 ```bash
@@ -474,7 +478,7 @@ cd dtc-mcp
 npm install
 cp .env.example .env    # Fill in your API credentials
 npm run build           # Compile TypeScript
-npm test                # Run tests (44 tests)
+npm test                # Run tests (46 tests)
 npm run dev             # Watch mode
 npm run inspect         # Open MCP Inspector for interactive testing
 ```

@@ -6,7 +6,7 @@ import { registerCrossPlatformTools } from "./cross-platform/tools.js";
 export function createServer(): McpServer {
   const server = new McpServer({
     name: "dtc-mcp",
-    version: "0.2.0",
+    version: "0.2.1",
   });
 
   registerKlaviyoTools(server);

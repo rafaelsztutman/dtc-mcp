@@ -29,6 +29,8 @@ import {
   toolResult,
 } from "../../shared/errors.js";
 
+const TOOL_ANNOTATIONS = { readOnlyHint: true, destructiveHint: false, openWorldHint: true } as const;
+
 export function registerShopifyTools(server: McpServer): void {
   // ---- Tool 9: Sales Summary ----
   server.tool(
@@ -41,6 +43,7 @@ export function registerShopifyTools(server: McpServer): void {
         .default(true)
         .describe("Include previous period comparison"),
     },
+    TOOL_ANNOTATIONS,
     async ({ days, compare_previous }) => {
       if (!isShopifyConfigured()) return shopifyNotConfigured();
 
@@ -75,6 +78,7 @@ export function registerShopifyTools(server: McpServer): void {
       metric: z.enum(["revenue", "units"]).default("revenue"),
       limit: z.number().min(1).max(25).default(10),
     },
+    TOOL_ANNOTATIONS,
     async ({ days, metric, limit }) => {
       if (!isShopifyConfigured()) return shopifyNotConfigured();
 
@@ -155,6 +159,7 @@ export function registerShopifyTools(server: McpServer): void {
         ),
       limit: z.number().min(1).max(25).default(10),
     },
+    TOOL_ANNOTATIONS,
     async ({ query: searchQuery, limit }) => {
       if (!isShopifyConfigured()) return shopifyNotConfigured();
 
@@ -222,6 +227,7 @@ export function registerShopifyTools(server: McpServer): void {
         .describe("Alert when inventory at or below this number"),
       limit: z.number().min(1).max(50).default(20),
     },
+    TOOL_ANNOTATIONS,
     async ({ threshold, limit }) => {
       if (!isShopifyConfigured()) return shopifyNotConfigured();
 
@@ -281,6 +287,7 @@ export function registerShopifyTools(server: McpServer): void {
         .describe("Cohort grouping"),
       months: z.number().min(1).max(36).default(24),
     },
+    TOOL_ANNOTATIONS,
     async ({ granularity, months }) => {
       if (!isShopifyConfigured()) return shopifyNotConfigured();
 
@@ -316,6 +323,7 @@ export function registerShopifyTools(server: McpServer): void {
       months: z.number().min(1).max(24).default(12),
       limit: z.number().min(1).max(50).default(20),
     },
+    TOOL_ANNOTATIONS,
     async ({ dimension, months, limit }) => {
       if (!isShopifyConfigured()) return shopifyNotConfigured();
 
@@ -353,6 +361,7 @@ export function registerShopifyTools(server: McpServer): void {
         .default("net_sales"),
       limit: z.number().min(1).max(50).default(10),
     },
+    TOOL_ANNOTATIONS,
     async ({ dimension, days, metric, limit }) => {
       if (!isShopifyConfigured()) return shopifyNotConfigured();
 
@@ -378,6 +387,7 @@ export function registerShopifyTools(server: McpServer): void {
         .describe("Sort products by this metric"),
       limit: z.number().min(1).max(50).default(10),
     },
+    TOOL_ANNOTATIONS,
     async ({ days, metric, limit }) => {
       if (!isShopifyConfigured()) return shopifyNotConfigured();
 
@@ -403,6 +413,7 @@ export function registerShopifyTools(server: McpServer): void {
       days: z.number().min(1).max(365).default(30),
       limit: z.number().min(1).max(50).default(10),
     },
+    TOOL_ANNOTATIONS,
     async ({ mode, days, limit }) => {
       if (!isShopifyConfigured()) return shopifyNotConfigured();
 
@@ -441,6 +452,7 @@ export function registerShopifyTools(server: McpServer): void {
       days: z.number().min(1).max(365).default(30),
       limit: z.number().min(1).max(50).default(10),
     },
+    TOOL_ANNOTATIONS,
     async ({ mode, days, limit }) => {
       if (!isShopifyConfigured()) return shopifyNotConfigured();
 
@@ -468,6 +480,7 @@ export function registerShopifyTools(server: McpServer): void {
     {
       limit: z.number().min(1).max(25).default(10),
     },
+    TOOL_ANNOTATIONS,
     async ({ limit }) => {
       if (!isShopifyConfigured()) return shopifyNotConfigured();
 
@@ -521,6 +534,7 @@ export function registerShopifyTools(server: McpServer): void {
         .default("daily")
         .describe("Time bucket size"),
     },
+    TOOL_ANNOTATIONS,
     async ({ days, granularity }) => {
       if (!isShopifyConfigured()) return shopifyNotConfigured();
 

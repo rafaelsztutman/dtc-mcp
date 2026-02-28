@@ -3,6 +3,8 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { computeRevenueAttribution, computeDashboard } from "./correlator.js";
 import { formatError, toolResult } from "../shared/errors.js";
 
+const TOOL_ANNOTATIONS = { readOnlyHint: true, destructiveHint: false, openWorldHint: true } as const;
+
 export function registerCrossPlatformTools(server: McpServer): void {
   // ---- Tool 15: Email Revenue Attribution ----
   server.tool(
@@ -11,6 +13,7 @@ export function registerCrossPlatformTools(server: McpServer): void {
     {
       days: z.number().min(1).max(365).default(30),
     },
+    TOOL_ANNOTATIONS,
     async ({ days }) => {
       try {
         const result = await computeRevenueAttribution(days);
@@ -28,6 +31,7 @@ export function registerCrossPlatformTools(server: McpServer): void {
     {
       days: z.number().min(7).max(90).default(30),
     },
+    TOOL_ANNOTATIONS,
     async ({ days }) => {
       try {
         const result = await computeDashboard(days);

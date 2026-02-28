@@ -23,6 +23,8 @@ import {
 } from "../../shared/errors.js";
 import { extractKlaviyoCursor } from "../../shared/pagination.js";
 
+const TOOL_ANNOTATIONS = { readOnlyHint: true, destructiveHint: false, openWorldHint: true } as const;
+
 export function registerKlaviyoTools(server: McpServer): void {
   // ---- Tool 1: Campaign Summary ----
   server.tool(
@@ -49,6 +51,7 @@ export function registerKlaviyoTools(server: McpServer): void {
         .default(10)
         .describe("Max campaigns to return"),
     },
+    TOOL_ANNOTATIONS,
     async ({ channel, metric, days, limit }) => {
       try {
         // Fetch campaigns with sparse fieldsets
@@ -93,6 +96,7 @@ export function registerKlaviyoTools(server: McpServer): void {
     {
       campaign_id: z.string().describe("Klaviyo campaign ID"),
     },
+    TOOL_ANNOTATIONS,
     async ({ campaign_id }) => {
       try {
         // Fetch campaign with message includes
@@ -146,6 +150,7 @@ export function registerKlaviyoTools(server: McpServer): void {
         .describe("Filter by flow status"),
       limit: z.number().min(1).max(25).default(10),
     },
+    TOOL_ANNOTATIONS,
     async ({ metric, days, status, limit }) => {
       try {
         const params: Record<string, string> = {
@@ -202,6 +207,7 @@ export function registerKlaviyoTools(server: McpServer): void {
       flow_id: z.string().describe("Klaviyo flow ID"),
       days: z.number().min(1).max(365).default(30),
     },
+    TOOL_ANNOTATIONS,
     async ({ flow_id, days }) => {
       try {
         // Step 1: Fetch flow with its actions (flow-messages not allowed on flows endpoint)
@@ -253,6 +259,7 @@ export function registerKlaviyoTools(server: McpServer): void {
         .optional()
         .describe("Specific list ID, or omit for all lists"),
     },
+    TOOL_ANNOTATIONS,
     async ({ list_id }) => {
       try {
         let lists;
@@ -295,6 +302,7 @@ export function registerKlaviyoTools(server: McpServer): void {
         .optional()
         .describe("Pagination cursor from previous response"),
     },
+    TOOL_ANNOTATIONS,
     async ({ type, cursor }) => {
       try {
         const lists =
@@ -359,6 +367,7 @@ export function registerKlaviyoTools(server: McpServer): void {
         .describe("Email address, phone number, or name to search"),
       limit: z.number().min(1).max(10).default(5),
     },
+    TOOL_ANNOTATIONS,
     async ({ query, limit }) => {
       try {
         // Detect query type
@@ -404,6 +413,7 @@ export function registerKlaviyoTools(server: McpServer): void {
         .optional()
         .describe("Filter to specific profile email"),
     },
+    TOOL_ANNOTATIONS,
     async ({ metric_name, days, limit, profile_email }) => {
       try {
         // Resolve metric name to ID
