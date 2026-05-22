@@ -12,3 +12,4 @@ dist/
 *.mcpb
 .mcpb-staging/
 scripts/
+tools/codegen/.cache/

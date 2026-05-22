@@ -1,17 +1,15 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { registerKlaviyoTools } from "./platforms/klaviyo/tools.js";
-import { registerShopifyTools } from "./platforms/shopify/tools.js";
-import { registerCrossPlatformTools } from "./cross-platform/tools.js";
+import { registerExecuteCode } from "./tools/execute_code.js";
+import { registerSearchDocs } from "./tools/search_docs.js";
 
 export function createServer(): McpServer {
   const server = new McpServer({
     name: "dtc-mcp",
-    version: "0.2.1",
+    version: "1.0.0-rc.1",
   });
 
-  registerKlaviyoTools(server);
-  registerShopifyTools(server);
-  registerCrossPlatformTools(server);
+  registerExecuteCode(server);
+  registerSearchDocs(server);
 
   return server;
 }

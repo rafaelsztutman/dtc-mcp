@@ -1,7 +1,7 @@
 {
   "name": "dtc-mcp",
-  "version": "0.2.1",
-  "description": "Context-optimized MCP server for DTC e-commerce brands (Klaviyo + Shopify). 80% less context usage than raw API wrappers.",
+  "version": "1.0.0-rc.1",
+  "description": "Stainless-style two-tool MCP server for DTC e-commerce. Replaces 22 hand-built tools with execute_code + search_docs — LLM writes TypeScript against typed Klaviyo + Shopify SDKs in an isolated V8 sandbox.",
   "type": "module",
   "bin": {
     "dtc-mcp": "dist/index.js"
@@ -13,7 +13,11 @@
     "start": "node dist/index.js",
     "test": "vitest run",
     "test:watch": "vitest",
-    "inspect": "npx @modelcontextprotocol/inspector dist/index.js"
+    "inspect": "npx @modelcontextprotocol/inspector dist/index.js",
+    "codegen:klaviyo": "tsx tools/codegen/klaviyo.ts",
+    "codegen:shopify": "tsx tools/codegen/shopify.ts",
+    "codegen:docs": "tsx tools/codegen/docs.ts",
+    "codegen": "npm run codegen:klaviyo && npm run codegen:shopify && npm run codegen:docs"
   },
   "keywords": [
     "mcp",
@@ -21,8 +25,10 @@
     "shopify",
     "dtc",
     "ecommerce",
-    "analytics",
-    "context-optimized"
+    "code-execution",
+    "sandbox",
+    "stainless",
+    "code-mode"
   ],
   "author": "Rafael Sztutman",
   "license": "MIT",
@@ -36,6 +42,7 @@
   },
   "files": [
     "dist",
+    "data",
     "README.md",
     "LICENSE"
   ],
@@ -45,10 +52,14 @@
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.27.0",
     "dotenv": "^17.3.1",
+    "isolated-vm": "^6.1.2",
+    "minisearch": "^7.1.0",
+    "sucrase": "^3.35.0",
     "zod": "^3.23.8"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",
+    "tsx": "^4.19.0",
     "typescript": "^5.5.0",
     "vitest": "^2.0.0"
   }

@@ -1,0 +1,200 @@
+[
+  {
+    "id": "guide.overview",
+    "title": "Overview: writing code in execute_code",
+    "platform": "guide",
+    "category": "guide",
+    "summary": "How the sandbox works and what's available.",
+    "content": "## execute_code sandbox\n\nWrite an async function body. Use `return` to return a value to the MCP caller. Globals: `klaviyo`, `shopify`, `console`. No `fetch`/`process`/`require`/`import`. Default wall-clock: 30s; opt-in via `// @timeout 2m` at the top (max 5m).\n\n```js\n// @timeout 1m\nconst metricId = await klaviyo.getConversionMetricId();\nconst lists = await klaviyo.lists.list({ 'page[size]': '100' });\nreturn { metricId, listCount: lists.data.length };\n```\n\nAll Klaviyo calls go through the host's rate limiter (10/s standard, 1/s reporting). All Shopify GraphQL calls go through Shopify's cost budget. Reporting POSTs and ShopifyQL queries are cached server-side; repeat calls within ~5–10 minutes don't re-hit the API.",
+    "tags": ["overview", "guide", "sandbox", "globals"]
+  },
+  {
+    "id": "guide.shopify-not-configured",
+    "title": "Klaviyo-only mode (no Shopify)",
+    "platform": "guide",
+    "category": "guide",
+    "summary": "What happens when SHOPIFY_* env vars are not set.",
+    "content": "If `SHOPIFY_STORE` (plus either client credentials or access token) is not set, all `shopify.*` calls throw with a configuration error. `klaviyo.*` calls still work. Check configuration availability before calling Shopify:\n\n```js\ntry {\n  const tz = await shopify.timezone();\n} catch (e) {\n  // Shopify not configured — fall back to Klaviyo-only analysis\n}\n```",
+    "tags": ["shopify", "config", "klaviyo-only"]
+  },
+  {
+    "id": "klaviyo.get",
+    "title": "klaviyo.get(path, options?)",
+    "platform": "klaviyo",
+    "category": "method",
+    "summary": "Low-level GET against the Klaviyo REST API.",
+    "content": "## klaviyo.get(path, options?)\n\nGeneric GET escape hatch. Pass any Klaviyo Admin API path. Bracket params (`page[size]`, `fields[campaign]`) work as plain string values — they are NOT percent-encoded.\n\n**Parameters**:\n- `path` (string) — e.g. `'lists'`, `'metrics'`, `'campaigns/01H...'`\n- `options.params?` (Record<string,string>) — query string params\n- `options.tier?` (`'standard' | 'reporting'`) — defaults to `'standard'`\n\n**Returns**: raw JSON:API response shape `{ data, links?, included? }`.\n\n```js\nconst metrics = await klaviyo.get('metrics', { params: { 'fields[metric]': 'name', 'page[size]': '100' } });\nreturn metrics.data.map(m => ({ id: m.id, name: m.attributes.name }));\n```",
+    "tags": ["klaviyo", "low-level", "get", "rest"]
+  },
+  {
+    "id": "klaviyo.post",
+    "title": "klaviyo.post(path, body, options?)",
+    "platform": "klaviyo",
+    "category": "method",
+    "summary": "Low-level POST against the Klaviyo REST API. Use for reporting endpoints.",
+    "content": "## klaviyo.post(path, body, options?)\n\nGeneric POST. Used primarily for reporting endpoints. When `options.tier === 'reporting'`, the response is cached for 10 minutes so repeated calls (e.g. iterating an analysis) don't burn the 1/s + 2/min budget.\n\n**Parameters**:\n- `path` (string) — e.g. `'campaign-values-reports'`\n- `body` (object) — JSON:API request body\n- `options.tier?` (`'standard' | 'reporting'`)\n\n```js\nconst metricId = await klaviyo.getConversionMetricId();\nconst report = await klaviyo.post('campaign-values-reports', {\n  data: { type: 'campaign-values-report', attributes: {\n    timeframe: { key: 'last_30_days' },\n    conversion_metric_id: metricId,\n    statistics: ['recipients', 'open_rate', 'conversion_value'],\n  }}\n}, { tier: 'reporting' });\nreturn report.data.attributes.results;\n```",
+    "tags": ["klaviyo", "low-level", "post", "reporting"]
+  },
+  {
+    "id": "klaviyo.paginate",
+    "title": "klaviyo.paginate(path, options?)",
+    "platform": "klaviyo",
+    "category": "method",
+    "summary": "Auto-paginate a Klaviyo GET endpoint up to N pages.",
+    "content": "## klaviyo.paginate(path, options?)\n\nFollows `links.next` cursors automatically. Capped at `maxPages` (default 5) — sets `truncated: true` if the cap was hit.\n\n**Parameters**:\n- `path` (string)\n- `options.params?` (Record<string,string>)\n- `options.tier?` (`'standard' | 'reporting'`)\n- `options.maxPages?` (number, default 5)\n\n**Returns**: `{ items: Array<{ id, type, attributes }>, truncated: boolean }`\n\n```js\nconst { items } = await klaviyo.paginate('lists', { params: { 'page[size]': '100' }, maxPages: 10 });\nreturn items.map(l => ({ id: l.id, name: l.attributes.name }));\n```",
+    "tags": ["klaviyo", "paginate", "lists", "iteration"]
+  },
+  {
+    "id": "klaviyo.getConversionMetricId",
+    "title": "klaviyo.getConversionMetricId()",
+    "platform": "klaviyo",
+    "category": "method",
+    "summary": "Discover the 'Placed Order' metric ID required by reporting endpoints.",
+    "content": "## klaviyo.getConversionMetricId()\n\nReturns the ID of the 'Placed Order' (or equivalent) conversion metric. Cached for server lifetime. Override with the `KLAVIYO_CONVERSION_METRIC_ID` env var if your store uses a non-standard metric name.\n\nThe Klaviyo `2026-01-15` revision doesn't allow filtering metrics by name, so this paginates all metrics and matches client-side: exact name match first (`'Placed Order'`, `'Order Placed'`, `'Shopify Placed Order'`), then fuzzy fallback (excludes refund/cancel metrics).\n\n```js\nconst metricId = await klaviyo.getConversionMetricId();\n```",
+    "tags": ["klaviyo", "metric", "conversion", "placed-order", "reporting"]
+  },
+  {
+    "id": "klaviyo.campaigns.list",
+    "title": "klaviyo.campaigns.list(params?)",
+    "platform": "klaviyo",
+    "category": "method",
+    "summary": "List campaigns (sugar for klaviyo.get('campaigns', ...)).",
+    "content": "## klaviyo.campaigns.list(params?)\n\nSee https://developers.klaviyo.com/en/reference/get_campaigns. Filter syntax required — at minimum a `filter` param scoping to a channel.\n\n```js\nconst { data } = await klaviyo.campaigns.list({\n  filter: 'equals(messages.channel,\"email\")',\n  sort: '-send_time',\n  'page[size]': '20',\n  'fields[campaign]': 'name,status,send_time',\n});\nreturn data.map(c => ({ id: c.id, ...c.attributes }));\n```",
+    "tags": ["klaviyo", "campaigns", "list"]
+  },
+  {
+    "id": "klaviyo.campaigns.get",
+    "title": "klaviyo.campaigns.get(id, params?)",
+    "platform": "klaviyo",
+    "category": "method",
+    "summary": "Get a campaign by ID with optional includes.",
+    "content": "## klaviyo.campaigns.get(id, params?)\n\nFetch one campaign. Use `include=campaign-messages,tags` to pull related entities in one call.\n\n```js\nconst { data, included } = await klaviyo.campaigns.get('01H...', {\n  include: 'campaign-messages',\n  'fields[campaign-message]': 'label,content',\n});\n```",
+    "tags": ["klaviyo", "campaigns", "detail"]
+  },
+  {
+    "id": "klaviyo.flows.list",
+    "title": "klaviyo.flows.list(params?)",
+    "platform": "klaviyo",
+    "category": "method",
+    "summary": "List flows.",
+    "content": "## klaviyo.flows.list(params?)\n\nSee https://developers.klaviyo.com/en/reference/get_flows.\n\n```js\nconst { data } = await klaviyo.flows.list({\n  filter: 'equals(status,\"live\")',\n  'page[size]': '50',\n  'fields[flow]': 'name,status,trigger_type',\n});\n```",
+    "tags": ["klaviyo", "flows", "list"]
+  },
+  {
+    "id": "klaviyo.flows.get",
+    "title": "klaviyo.flows.get(id, params?)",
+    "platform": "klaviyo",
+    "category": "method",
+    "summary": "Get a flow with its actions/messages.",
+    "content": "## klaviyo.flows.get(id, params?)\n\n```js\nconst { data, included } = await klaviyo.flows.get('Vd...', {\n  include: 'flow-actions',\n});\n```",
+    "tags": ["klaviyo", "flows", "detail"]
+  },
+  {
+    "id": "klaviyo.lists.list",
+    "title": "klaviyo.lists.list(params?)",
+    "platform": "klaviyo",
+    "category": "method",
+    "summary": "List subscriber lists.",
+    "content": "```js\nconst { data } = await klaviyo.lists.list({ 'page[size]': '100' });\n```",
+    "tags": ["klaviyo", "lists"]
+  },
+  {
+    "id": "klaviyo.segments.list",
+    "title": "klaviyo.segments.list(params?)",
+    "platform": "klaviyo",
+    "category": "method",
+    "summary": "List segments.",
+    "content": "```js\nconst { data } = await klaviyo.segments.list({ 'page[size]': '100' });\n```",
+    "tags": ["klaviyo", "segments"]
+  },
+  {
+    "id": "klaviyo.profiles.list",
+    "title": "klaviyo.profiles.list(params?)",
+    "platform": "klaviyo",
+    "category": "method",
+    "summary": "Search/list profiles.",
+    "content": "## klaviyo.profiles.list(params?)\n\nFilter required for search. Common: `filter=equals(email,\"x@y.com\")` or `filter=contains(email,\"acme\")`.\n\n```js\nconst { data } = await klaviyo.profiles.list({\n  filter: 'equals(email,\"alice@example.com\")',\n  'fields[profile]': 'email,first_name,last_name,phone_number',\n});\n```",
+    "tags": ["klaviyo", "profiles", "search"]
+  },
+  {
+    "id": "klaviyo.events.list",
+    "title": "klaviyo.events.list(params?)",
+    "platform": "klaviyo",
+    "category": "method",
+    "summary": "List recent events for a metric.",
+    "content": "## klaviyo.events.list(params?)\n\nFilter by `metric_id` to scope to one metric (e.g. Placed Order).\n\n```js\nconst metricId = await klaviyo.getConversionMetricId();\nconst { data } = await klaviyo.events.list({\n  filter: `equals(metric_id,\"${metricId}\")`,\n  sort: '-datetime',\n  'page[size]': '50',\n  include: 'profile',\n});\n```",
+    "tags": ["klaviyo", "events", "activity"]
+  },
+  {
+    "id": "klaviyo.metrics.list",
+    "title": "klaviyo.metrics.list(params?)",
+    "platform": "klaviyo",
+    "category": "method",
+    "summary": "List all metrics.",
+    "content": "```js\nconst { data } = await klaviyo.metrics.list({\n  'fields[metric]': 'name,integration',\n  'page[size]': '100',\n});\n```",
+    "tags": ["klaviyo", "metrics"]
+  },
+  {
+    "id": "klaviyo.reporting.campaignValues",
+    "title": "klaviyo.reporting.campaignValues(body)",
+    "platform": "klaviyo",
+    "category": "method",
+    "summary": "Campaign reporting (revenue, opens, clicks). Cached 10 min.",
+    "content": "## klaviyo.reporting.campaignValues(body)\n\nWrapper for `POST /campaign-values-reports`. Reporting tier — rate limited at 1/s, 2/min. Results cached 10 minutes.\n\n```js\nconst metricId = await klaviyo.getConversionMetricId();\nconst report = await klaviyo.reporting.campaignValues({\n  data: { type: 'campaign-values-report', attributes: {\n    timeframe: { key: 'last_30_days' },\n    conversion_metric_id: metricId,\n    statistics: ['recipients', 'opens', 'open_rate', 'clicks', 'click_rate', 'conversion_value', 'conversions'],\n  }}\n});\nreturn report.data.attributes.results\n  .sort((a, b) => b.statistics.conversion_value - a.statistics.conversion_value)\n  .slice(0, 5);\n```",
+    "tags": ["klaviyo", "reporting", "campaigns", "revenue"]
+  },
+  {
+    "id": "klaviyo.reporting.flowValues",
+    "title": "klaviyo.reporting.flowValues(body)",
+    "platform": "klaviyo",
+    "category": "method",
+    "summary": "Flow reporting (revenue, opens, clicks). Cached 10 min.",
+    "content": "## klaviyo.reporting.flowValues(body)\n\nSame shape as campaignValues but for flows. `POST /flow-values-reports`.\n\n```js\nconst metricId = await klaviyo.getConversionMetricId();\nconst report = await klaviyo.reporting.flowValues({\n  data: { type: 'flow-values-report', attributes: {\n    timeframe: { key: 'last_30_days' },\n    conversion_metric_id: metricId,\n    statistics: ['recipients', 'click_rate', 'conversion_rate', 'conversion_value'],\n  }}\n});\n```",
+    "tags": ["klaviyo", "reporting", "flows", "revenue"]
+  },
+  {
+    "id": "shopify.gql",
+    "title": "shopify.gql(query, options?)",
+    "platform": "shopify",
+    "category": "method",
+    "summary": "Execute a GraphQL query against the Shopify Admin API.",
+    "content": "## shopify.gql(query, options?)\n\nLow-level GraphQL escape hatch. Cost-budget aware: waits until enough capacity restores before sending. Auto-retries once on `THROTTLED`.\n\n**Parameters**:\n- `query` (string) — GraphQL document\n- `options.variables?` (object)\n- `options.estimatedCost?` (number, default 10) — used to pre-wait if budget is low\n\n**Returns**: the `data` field of the GraphQL response.\n\n```js\nconst data = await shopify.gql(`\n  query($first: Int!) {\n    products(first: $first, sortKey: TITLE) {\n      nodes { id title vendor }\n    }\n  }\n`, { variables: { first: 50 } });\nreturn data.products.nodes;\n```",
+    "tags": ["shopify", "graphql", "gql", "low-level"]
+  },
+  {
+    "id": "shopify.ql",
+    "title": "shopify.ql(query)",
+    "platform": "shopify",
+    "category": "method",
+    "summary": "Execute a ShopifyQL query for pre-aggregated analytics.",
+    "content": "## shopify.ql(query)\n\nWraps `shopifyqlQuery`. ShopifyQL is Shopify's analytics DSL — much faster than aggregating orders client-side. Results cached 5 minutes.\n\n**Returns**: `{ columns: [{name, dataType, displayName}], rows: [Record<string,string>] }`\n\n```js\nconst sales = await shopify.ql(`\n  FROM sales\n  SHOW gross_sales, net_sales, orders\n  GROUP BY day\n  SINCE -30d UNTIL today\n  ORDER BY day ASC\n`);\nreturn sales.rows;\n```\n\nReference: https://shopify.dev/docs/api/shopifyql",
+    "tags": ["shopify", "shopifyql", "ql", "analytics", "sales"]
+  },
+  {
+    "id": "shopify.timezone",
+    "title": "shopify.timezone()",
+    "platform": "shopify",
+    "category": "method",
+    "summary": "Get the store's IANA timezone (cached per server lifetime).",
+    "content": "## shopify.timezone()\n\nReturns the store's IANA timezone string (e.g. `'America/New_York'`). Cached for server lifetime — call freely.\n\n```js\nconst tz = await shopify.timezone();\nconst today = new Date().toLocaleDateString('en-CA', { timeZone: tz });\n```",
+    "tags": ["shopify", "timezone", "shop"]
+  },
+  {
+    "id": "guide.recipe.dashboard",
+    "title": "Recipe: full DTC health dashboard (replaces dtc_dashboard)",
+    "platform": "guide",
+    "category": "recipe",
+    "summary": "Cross-platform dashboard combining Klaviyo email metrics + Shopify sales.",
+    "content": "## Recipe: full DTC health dashboard\n\nThis replaces the old `dtc_dashboard` tool. Run both API surfaces in parallel via `Promise.all`.\n\n```js\n// @timeout 1m\nconst days = 30;\nconst metricId = await klaviyo.getConversionMetricId();\n\nconst [sales, campaignReport, flowReport] = await Promise.all([\n  shopify.ql(`FROM sales SHOW gross_sales, net_sales, orders SINCE -${days}d UNTIL today`),\n  klaviyo.reporting.campaignValues({\n    data: { type: 'campaign-values-report', attributes: {\n      timeframe: { key: 'last_30_days' },\n      conversion_metric_id: metricId,\n      statistics: ['conversion_value', 'recipients', 'open_rate'],\n    }}\n  }),\n  klaviyo.reporting.flowValues({\n    data: { type: 'flow-values-report', attributes: {\n      timeframe: { key: 'last_30_days' },\n      conversion_metric_id: metricId,\n      statistics: ['conversion_value', 'recipients'],\n    }}\n  }),\n]);\n\nconst row = sales.rows[0] || {};\nconst totalRevenue = parseFloat(row.net_sales || '0');\nconst orders = parseInt(row.orders || '0');\n\nconst campaignRevenue = (campaignReport.data.attributes.results || [])\n  .reduce((s, r) => s + (r.statistics.conversion_value || 0), 0);\nconst flowRevenue = (flowReport.data.attributes.results || [])\n  .reduce((s, r) => s + (r.statistics.conversion_value || 0), 0);\n\nreturn {\n  period_days: days,\n  sales: { revenue: totalRevenue, orders, aov: orders ? totalRevenue / orders : 0 },\n  email: {\n    total_email_revenue: campaignRevenue + flowRevenue,\n    pct_of_total: totalRevenue ? ((campaignRevenue + flowRevenue) / totalRevenue) * 100 : 0,\n    campaign_revenue: campaignRevenue,\n    flow_revenue: flowRevenue,\n  },\n};\n```",
+    "tags": ["recipe", "dashboard", "cross-platform", "attribution"]
+  },
+  {
+    "id": "guide.recipe.top-campaigns",
+    "title": "Recipe: top N campaigns by revenue (replaces klaviyo_campaign_summary)",
+    "platform": "guide",
+    "category": "recipe",
+    "summary": "Replicates the old klaviyo_campaign_summary tool in <20 lines.",
+    "content": "```js\nconst metricId = await klaviyo.getConversionMetricId();\nconst report = await klaviyo.reporting.campaignValues({\n  data: { type: 'campaign-values-report', attributes: {\n    timeframe: { key: 'last_30_days' },\n    conversion_metric_id: metricId,\n    statistics: ['recipients', 'opens_unique', 'open_rate', 'clicks_unique', 'click_rate', 'conversion_value'],\n  }}\n});\n\nconst rows = (report.data.attributes.results || [])\n  .map(r => ({\n    campaign_id: r.groupings.campaign_id,\n    recipients: r.statistics.recipients,\n    open_rate: r.statistics.open_rate,\n    click_rate: r.statistics.click_rate,\n    revenue: r.statistics.conversion_value,\n  }))\n  .sort((a, b) => b.revenue - a.revenue)\n  .slice(0, 10);\n\n// Hydrate names (only for the top 10 — saves rate-limit budget)\nfor (const row of rows) {\n  const { data } = await klaviyo.campaigns.get(row.campaign_id, {\n    'fields[campaign]': 'name,send_time',\n  });\n  row.name = data.attributes.name;\n  row.send_time = data.attributes.send_time;\n}\nreturn rows;\n```",
+    "tags": ["recipe", "campaigns", "summary", "top"]
+  }
+]

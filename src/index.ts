@@ -3,7 +3,8 @@
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { createServer } from "./server.js";
 
-// Load .env for local development (not needed in .mcpb — env vars come from user_config)
+// Local-dev convenience: load .env if present. .mcpb installs pass user_config
+// through process.env directly, so this is a no-op there.
 import("dotenv")
   .then(async (m) => {
     const { fileURLToPath } = await import("url");
@@ -21,4 +22,4 @@ server.connect(transport).catch((err: unknown) => {
   process.exit(1);
 });
 
-console.error("[dtc-mcp] server running");
+console.error("[dtc-mcp] v1.0.0-rc.1 ready");

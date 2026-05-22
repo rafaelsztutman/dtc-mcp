@@ -2,8 +2,8 @@
   "manifest_version": "0.3",
   "name": "dtc-mcp",
   "display_name": "DTC E-Commerce Analytics",
-  "version": "0.2.1",
-  "description": "Connect Claude to your Klaviyo and Shopify data with 22 pre-built analytics tools. Context-optimized — uses ~80% less context than raw API wrappers.",
+  "version": "1.0.0-rc.1",
+  "description": "Stainless-style two-tool MCP for Klaviyo + Shopify. LLM writes TypeScript against typed SDKs in an isolated V8 sandbox — replaces the 22-tool surface of v0.2 with execute_code + search_docs.",
   "author": {
     "name": "Rafael Sztutman"
   },
@@ -13,7 +13,7 @@
     "url": "https://github.com/rafaelsztutman/dtc-mcp"
   },
   "homepage": "https://github.com/rafaelsztutman/dtc-mcp#readme",
-  "keywords": ["klaviyo", "shopify", "dtc", "ecommerce", "analytics"],
+  "keywords": ["klaviyo", "shopify", "dtc", "ecommerce", "code-execution", "sandbox"],
   "privacy_policies": [
     "https://github.com/rafaelsztutman/dtc-mcp/blob/main/PRIVACY.md"
   ],
@@ -78,27 +78,13 @@
     }
   },
   "tools": [
-    { "name": "klaviyo_campaign_summary", "description": "Top campaigns ranked by metric" },
-    { "name": "klaviyo_campaign_detail", "description": "Deep dive on one campaign" },
-    { "name": "klaviyo_flow_summary", "description": "Top flows by metric" },
-    { "name": "klaviyo_flow_detail", "description": "Per-message flow breakdown" },
-    { "name": "klaviyo_subscriber_health", "description": "List growth and engagement" },
-    { "name": "klaviyo_list_segments", "description": "All lists and segments with sizes" },
-    { "name": "klaviyo_search_profiles", "description": "Find profiles by email/phone/name" },
-    { "name": "klaviyo_recent_activity", "description": "Recent events for a metric" },
-    { "name": "shopify_sales_summary", "description": "Revenue, orders, AOV with comparison" },
-    { "name": "shopify_sales_timeseries", "description": "Revenue by day/week/month" },
-    { "name": "shopify_product_performance", "description": "Top products by revenue or units" },
-    { "name": "shopify_order_search", "description": "Find orders by number/email/status" },
-    { "name": "shopify_inventory_alerts", "description": "Low and zero stock products" },
-    { "name": "shopify_customer_cohorts", "description": "Monthly/quarterly acquisition cohorts with LTV" },
-    { "name": "shopify_customer_segments", "description": "Customer distribution by RFM, spend, country" },
-    { "name": "shopify_sales_breakdown", "description": "Revenue/orders by country, channel, vendor, source" },
-    { "name": "shopify_product_analytics", "description": "Product performance with margins and returns" },
-    { "name": "shopify_traffic_sources", "description": "Sessions by source, landing page, or trend" },
-    { "name": "shopify_returns_analysis", "description": "Return rates, costs, most-returned products" },
-    { "name": "shopify_recent_orders", "description": "Most recent orders snapshot" },
-    { "name": "dtc_email_revenue_attribution", "description": "Email revenue vs total revenue" },
-    { "name": "dtc_dashboard", "description": "Full DTC health dashboard" }
+    {
+      "name": "execute_code",
+      "description": "Run TypeScript-like JavaScript against typed Klaviyo + Shopify SDKs in an isolated V8 sandbox. Replaces 22 hand-built tools with arbitrary composability."
+    },
+    {
+      "name": "search_docs",
+      "description": "Search SDK reference docs for Klaviyo and Shopify methods exposed in the sandbox. Use before writing code in execute_code."
+    }
   ]
 }

@@ -1,44 +1,95 @@
-# dtc-mcp
+# dtc-mcp v1.0
 
-Context-optimized MCP server for DTC e-commerce brands. Connect Claude (or any MCP client) to your Klaviyo and Shopify data with 22 pre-built analytics tools.
+**Stainless-style two-tool MCP for DTC e-commerce.** The LLM writes TypeScript against typed Klaviyo + Shopify SDKs in an isolated V8 sandbox — instead of picking from a long menu of pre-built tools.
 
-Unlike raw API wrappers, dtc-mcp pre-aggregates data server-side and returns only actionable fields — using ~80% less context than dumping raw API responses into your conversation.
+> v1.0 is a complete rewrite of [v0.2](https://github.com/rafaelsztutman/dtc-mcp/tree/v0.2). The 22 hand-built analytics tools are gone; in their place are two tools that compose to anything those 22 could do — and arbitrary new analyses besides. See **Migration from v0.2** below.
 
-## Features
+Inspired by [Stainless's code-execution MCP architecture](https://www.stainless.com/docs/mcp/) and [Cloudflare's Code Mode](https://blog.cloudflare.com/code-mode-mcp/), which both report ~99% input-token reduction vs traditional one-tool-per-endpoint MCPs.
 
-- **8 Klaviyo tools** — campaign performance, flow breakdowns, subscriber health, profile search, event activity
-- **12 Shopify tools** — sales summaries, time series, product performance, inventory alerts, customer cohorts & segments, sales breakdowns by country/channel/vendor, traffic sources, returns analysis, order search
-- **2 cross-platform tools** — email revenue attribution, full DTC health dashboard
-- **Dual revenue metrics** — both gross and net revenue on every sales query
-- **ShopifyQL-powered analytics** — fast aggregated queries for sales, customers, and sessions
-- **Aggressive caching** — respects Klaviyo's strict rate limits (1 req/s on reporting)
+## The two tools
 
-## Quick Start
+### `execute_code`
+Runs JavaScript (TypeScript syntax supported, stripped via [sucrase](https://github.com/alangpierce/sucrase)) inside a fresh [isolated-vm](https://github.com/laverdet/isolated-vm) V8 isolate. Globals exposed:
+
+- `klaviyo` — typed client wrapping the Klaviyo REST API (`get`, `post`, `paginate`, plus `campaigns`, `flows`, `lists`, `segments`, `profiles`, `events`, `metrics`, `reporting.{campaignValues,flowValues}`)
+- `shopify` — typed client for Shopify Admin GraphQL + ShopifyQL (`gql`, `ql`, `timezone`)
+- `console.{log,error,warn,info}` — captured and returned to the caller as `stdout`
+
+The host applies rate limiting, auth, and caching transparently — Klaviyo's dual-tier limiter (1/s reporting, 10/s standard), Shopify's GraphQL cost budget, and a 10-min reporting POST cache all carry over from v0.2's battle-tested implementations.
+
+Defaults: 30s wall-clock, 128MB heap. Opt-in `// @timeout 2m` (max 5m).
+
+```js
+// Top 5 email campaigns by revenue, last 30 days, with names hydrated.
+const metricId = await klaviyo.getConversionMetricId();
+const report = await klaviyo.reporting.campaignValues({
+  data: { type: "campaign-values-report", attributes: {
+    timeframe: { key: "last_30_days" },
+    conversion_metric_id: metricId,
+    statistics: ["recipients", "open_rate", "conversion_value"],
+  }}
+});
+const top = report.data.attributes.results
+  .sort((a, b) => b.statistics.conversion_value - a.statistics.conversion_value)
+  .slice(0, 5);
+for (const r of top) {
+  const { data } = await klaviyo.campaigns.get(r.groupings.campaign_id, { "fields[campaign]": "name" });
+  r.name = data.attributes.name;
+}
+return top;
+```
+
+### `search_docs`
+Searches the bundled SDK reference (MiniSearch / BM25) for method signatures, parameter docs, and runnable recipes. Use this **before** writing code in `execute_code` — it tells the LLM exactly which methods are exposed and how to call them.
+
+Docs are auto-refreshed daily from [dtc-mcp-docs](https://github.com/rafaelsztutman/dtc-mcp-docs) via jsDelivr CDN (with ETag negotiation). New Klaviyo / Shopify API revisions land without a new MCP release.
+
+## Architecture
+
+```
+┌─ dtc-mcp v1.0 (stdio MCP server) ──────────────────────┐
+│                                                         │
+│  execute_code ──→ isolated-vm V8 isolate                │
+│                   ├ klaviyo proxy ──┐                   │
+│                   ├ shopify proxy ──┼→ host bridge      │
+│                   └ console capture │                   │
+│                                     ▼                   │
+│                              ┌─ host SDK ─────────┐     │
+│                              │ - Klaviyo rate     │     │
+│                              │   limiter + cache  │     │
+│                              │ - Shopify token    │     │
+│                              │   mgr + cost track │     │
+│                              └────────────────────┘     │
+│                                     │                   │
+│  search_docs ──→ MiniSearch ◄───────┘  HTTP             │
+│                  in-memory          (Klaviyo, Shopify)  │
+│                  index of docs.json                     │
+│                                                         │
+└─────────────────────────────────────────────────────────┘
+```
+
+The sandbox has **no `fetch`, no `process`, no filesystem, no env**. The only way out is the host bridge, which validates every call against a method registry — unknown paths are rejected.
+
+## Quick start
 
 ```bash
 npm install -g dtc-mcp
 ```
 
-Or run directly:
+Or via `npx`:
 
 ```bash
 npx dtc-mcp
 ```
 
-## Setup with Claude Desktop
+### Claude Desktop (Desktop Extension)
 
-### Option A: Desktop Extension (one-click install)
+1. Download the latest `dtc-mcp.mcpb` from [Releases](https://github.com/rafaelsztutman/dtc-mcp/releases)
+2. Double-click to install — Claude Desktop opens an install dialog
+3. Paste your Klaviyo key (required) and Shopify creds (optional)
+4. The two tools (`execute_code`, `search_docs`) appear in the hammer menu
 
-1. Download the latest `dtc-mcp.mcpb` from [GitHub Releases](https://github.com/rafaelsztutman/dtc-mcp/releases)
-2. Double-click the `.mcpb` file — Claude Desktop will open an install dialog
-3. Enter your API credentials when prompted (Klaviyo key required, Shopify optional)
-4. The 22 tools will appear in the hammer menu automatically
-
-### Option B: Manual Configuration
-
-1. Open Claude Desktop
-2. Go to **Settings** (gear icon) > **Developer** > **Edit Config**
-3. Add the following to your `claude_desktop_config.json`:
+### Claude Desktop (manual config)
 
 ```json
 {
@@ -57,432 +108,74 @@ npx dtc-mcp
 }
 ```
 
-1. Restart Claude Desktop
-2. Look for the hammer icon in the chat input — that confirms the MCP tools are loaded
-
-### Klaviyo-only mode
-
-If you only use Klaviyo (no Shopify), just omit the Shopify variables. The 8 Klaviyo tools and subscriber analytics will work standalone. Shopify tools will return a helpful "not configured" message.
-
-## Setup with ChatGPT
-
-ChatGPT supports MCP servers via remote connections. Since dtc-mcp uses stdio transport (runs locally), you would need an MCP-to-HTTP bridge to expose it as a remote server. See [OpenAI's MCP documentation](https://platform.openai.com/docs/guides/tools-remote-mcp) for details on connecting remote MCP servers.
-
-## Getting Your API Credentials
-
-### Klaviyo API Key
-
-1. Log into [Klaviyo](https://www.klaviyo.com/login)
-2. Go to **Settings** (bottom-left) > **Account** > **Settings**
-3. Click **API Keys** in the left sidebar
-4. Click **Create Private API Key**
-5. Give it a name (e.g., "dtc-mcp")
-6. Select **Read-only** access for these scopes:
-  - `campaigns:read`
-  - `flows:read`
-  - `lists:read`
-  - `segments:read`
-  - `profiles:read`
-  - `metrics:read`
-  - `events:read`
-7. Copy the key (starts with `pk_`)
-
-### Shopify Credentials
-
-There are two authentication methods. Use whichever matches your app type.
-
-#### Option A: Dev Dashboard App (Recommended)
-
-For apps created in the [Shopify Partners Dashboard](https://partners.shopify.com/) or Shopify CLI (required for new apps since January 2026):
-
-1. Go to your app in the Partners Dashboard
-2. Navigate to **Configuration** > **Client credentials**
-3. Copy the **Client ID** and **Client Secret**
-4. Your store URL is your `*.myshopify.com` domain
-
-Set these environment variables:
-
-```
-SHOPIFY_STORE=your-store.myshopify.com
-SHOPIFY_CLIENT_ID=your_client_id
-SHOPIFY_CLIENT_SECRET=shpss_your_secret
-```
-
-**Required scopes:** `read_orders`, `read_products`, `read_customers`, `read_inventory`, `read_reports`
-
-#### Option B: Legacy Custom App
-
-For custom apps created directly in Shopify Admin (apps created before January 2026):
-
-1. Go to **Shopify Admin** > **Settings** > **Apps and sales channels**
-2. Click **Develop apps** > select your app
-3. Go to **API credentials** and copy the **Admin API access token**
-
-Set these environment variables:
-
-```
-SHOPIFY_STORE=your-store.myshopify.com
-SHOPIFY_ACCESS_TOKEN=shpat_your_token_here
-```
-
-> Do not set both `SHOPIFY_ACCESS_TOKEN` and `SHOPIFY_CLIENT_ID`/`SHOPIFY_CLIENT_SECRET` at the same time. The server will error if both are present.
-
-## Environment Variables
-
-
-| Variable                       | Required                    | Description                                           |
-| ------------------------------ | --------------------------- | ----------------------------------------------------- |
-| `KLAVIYO_API_KEY`              | Yes                         | Klaviyo private API key (starts with `pk_`)           |
-| `SHOPIFY_STORE`                | For Shopify                 | Your `*.myshopify.com` domain                         |
-| `SHOPIFY_CLIENT_ID`            | For Shopify (Dev Dashboard) | App client ID                                         |
-| `SHOPIFY_CLIENT_SECRET`        | For Shopify (Dev Dashboard) | App client secret (starts with `shpss_`)              |
-| `SHOPIFY_ACCESS_TOKEN`         | For Shopify (Legacy)        | Admin API access token (starts with `shpat_`)         |
-| `SHOPIFY_API_VERSION`          | No                          | Shopify API version (default: `2026-01`)              |
-| `KLAVIYO_CONVERSION_METRIC_ID` | No                          | Override auto-discovered "Placed Order" metric ID     |
-| `LOG_LEVEL`                    | No                          | `debug` | `info` | `warn` | `error` (default: `info`) |
-
-
-## Tool Reference
-
-### Klaviyo Tools
-
-#### `klaviyo_campaign_summary`
-
-Top campaigns ranked by metric. Returns name, send date, opens, clicks, revenue.
-
-
-| Parameter | Type                                                          | Default     | Description     |
-| --------- | ------------------------------------------------------------- | ----------- | --------------- |
-| `channel` | `"email"` | `"sms"`                                           | required    | Channel filter  |
-| `metric`  | `"revenue"` | `"open_rate"` | `"click_rate"` | `"recipients"` | `"revenue"` | Rank by         |
-| `days`    | 1-365                                                         | 30          | Lookback period |
-| `limit`   | 1-25                                                          | 10          | Max results     |
-
-
-> "Show me my top email campaigns by revenue this month"
-
-#### `klaviyo_campaign_detail`
-
-Deep dive on one campaign: full metrics, subject line, audiences, send time.
-
-
-| Parameter     | Type   | Default  | Description         |
-| ------------- | ------ | -------- | ------------------- |
-| `campaign_id` | string | required | Klaviyo campaign ID |
-
-
-> "Give me the full breakdown on my Black Friday campaign"
-
-#### `klaviyo_flow_summary`
-
-Top flows by metric. Returns name, status, trigger, message count, revenue.
-
-
-| Parameter | Type                                                                | Default     | Description      |
-| --------- | ------------------------------------------------------------------- | ----------- | ---------------- |
-| `metric`  | `"revenue"` | `"click_rate"` | `"conversion_rate"` | `"recipients"` | `"revenue"` | Rank by          |
-| `days`    | 1-365                                                               | 30          | Lookback period  |
-| `status`  | `"live"` | `"draft"` | `"manual"` | `"all"`                         | `"live"`    | Filter by status |
-| `limit`   | 1-25                                                                | 10          | Max results      |
-
-
-> "Which of my flows generates the most revenue?"
-
-#### `klaviyo_flow_detail`
-
-Deep dive on one flow: per-message performance breakdown.
-
-
-| Parameter | Type   | Default  | Description     |
-| --------- | ------ | -------- | --------------- |
-| `flow_id` | string | required | Klaviyo flow ID |
-| `days`    | 1-365  | 30       | Lookback period |
-
-
-> "Show me the per-email breakdown of my welcome flow"
-
-#### `klaviyo_subscriber_health`
-
-List growth and engagement tier breakdown.
-
-
-| Parameter | Type   | Default  | Description                 |
-| --------- | ------ | -------- | --------------------------- |
-| `list_id` | string | optional | Specific list, or all lists |
-
-
-> "What's the health of my email list?"
-
-#### `klaviyo_list_segments`
-
-All lists and segments with sizes.
-
-
-| Parameter | Type                               | Default  | Description       |
-| --------- | ---------------------------------- | -------- | ----------------- |
-| `type`    | `"lists"` | `"segments"` | `"all"` | `"all"`  | Filter by type    |
-| `cursor`  | string                             | optional | Pagination cursor |
-
-
-> "List all my Klaviyo segments and their sizes"
-
-#### `klaviyo_search_profiles`
-
-Find profiles by email, phone, or name.
-
-
-| Parameter | Type   | Default  | Description           |
-| --------- | ------ | -------- | --------------------- |
-| `query`   | string | required | Email, phone, or name |
-| `limit`   | 1-10   | 5        | Max results           |
-
-
-> "Look up the profile for [john@example.com](mailto:john@example.com)"
-
-#### `klaviyo_recent_activity`
-
-Recent events for a metric (e.g., Placed Order, Opened Email).
-
-
-| Parameter       | Type   | Default          | Description           |
-| --------------- | ------ | ---------------- | --------------------- |
-| `metric_name`   | string | `"Placed Order"` | Metric name           |
-| `days`          | 1-90   | 7                | Lookback period       |
-| `limit`         | 1-25   | 10               | Max events            |
-| `profile_email` | string | optional         | Filter to one profile |
-
-
-> "Show me the last 10 orders placed"
-
-### Shopify Tools
-
-#### `shopify_sales_summary`
-
-Revenue (gross + net), orders, AOV for a period with comparison.
-
-
-| Parameter          | Type    | Default | Description                        |
-| ------------------ | ------- | ------- | ---------------------------------- |
-| `days`             | 1-90    | 30      | Lookback period                    |
-| `compare_previous` | boolean | true    | Include previous period comparison |
-
-
-> "What were my sales last month compared to the month before?"
-
-#### `shopify_sales_timeseries`
-
-Revenue and orders broken down by day, week, or month.
-
-
-| Parameter     | Type                                 | Default   | Description     |
-| ------------- | ------------------------------------ | --------- | --------------- |
-| `days`        | 1-365                                | 30        | Lookback period |
-| `granularity` | `"daily"` | `"weekly"` | `"monthly"` | `"daily"` | Bucket size     |
-
-
-> "Show me daily revenue for this month"
-
-#### `shopify_product_performance`
-
-Top products by revenue or units sold.
-
-
-| Parameter | Type                    | Default     | Description     |
-| --------- | ----------------------- | ----------- | --------------- |
-| `days`    | 1-90                    | 7           | Lookback period |
-| `metric`  | `"revenue"` | `"units"` | `"revenue"` | Rank by         |
-| `limit`   | 1-25                    | 10          | Max results     |
-
-
-> "Which products sold the most units this week?"
-
-#### `shopify_order_search`
-
-Find orders by number, email, or status.
-
-
-| Parameter | Type   | Default  | Description                                     |
-| --------- | ------ | -------- | ----------------------------------------------- |
-| `query`   | string | required | Order number, email, or `financial_status:paid` |
-| `limit`   | 1-25   | 10       | Max results                                     |
-
-
-> "Find order #1234"
-
-#### `shopify_inventory_alerts`
-
-Products with low or zero stock, sorted by most urgent.
-
-
-| Parameter   | Type   | Default | Description                     |
-| ----------- | ------ | ------- | ------------------------------- |
-| `threshold` | number | 10      | Alert at or below this quantity |
-| `limit`     | 1-50   | 20      | Max results                     |
-
-
-> "Which products are running low on stock?"
-
-#### `shopify_customer_cohorts`
-
-Monthly or quarterly acquisition cohorts with LTV and retention signals.
-
-
-| Parameter     | Type                        | Default     | Description     |
-| ------------- | --------------------------- | ----------- | --------------- |
-| `granularity` | `"monthly"` | `"quarterly"` | `"monthly"` | Cohort grouping |
-| `months`      | 1-24                        | 12          | Lookback period |
-
-
-> "Show me customer cohorts by month — which cohort has the best LTV?"
-
-#### `shopify_customer_segments`
-
-Customer distribution by RFM group, spend tier, country, or tags.
-
-
-| Parameter   | Type                                                                                                                                                                                               | Default  | Description            |
-| ----------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------- | ---------------------- |
-| `dimension` | `"rfm_group"` | `"predicted_spend_tier"` | `"customer_email_subscription_status"` | `"customer_sms_subscription_status"` | `"customer_country"` | `"customer_tag"` | `"customer_number_of_orders"` | required | Segmentation dimension |
-| `months`    | 1-24                                                                                                                                                                                               | 12       | Lookback period        |
-| `limit`     | 1-50                                                                                                                                                                                               | 20       | Max segments           |
-
-
-> "Break down my customers by RFM group — who are my champions vs at-risk?"
-
-#### `shopify_sales_breakdown`
-
-Revenue and orders broken down by country, channel, vendor, or traffic source.
-
-
-| Parameter   | Type                                                                                                                                                                                              | Default       | Description         |
-| ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------- | ------------------- |
-| `dimension` | `"billing_country"` | `"billing_region"` | `"channel_name"` | `"product_vendor"` | `"referrer_source"` | `"referring_channel"` | `"referring_platform"` | `"traffic_type"` | `"shipping_country"` | required      | Breakdown dimension |
-| `days`      | 1-365                                                                                                                                                                                             | 30            | Lookback period     |
-| `metric`    | `"total_sales"` | `"net_sales"` | `"orders"` | `"average_order_value"` | `"gross_profit"`                                                                                                         | `"net_sales"` | Metric to rank by   |
-| `limit`     | 1-50                                                                                                                                                                                              | 10            | Max results         |
-
-
-> "What are my top countries by revenue?" or "Break down sales by channel"
-
-#### `shopify_product_analytics`
-
-Product performance with margins, returns, and quantities via ShopifyQL.
-
-
-| Parameter | Type                                                            | Default       | Description      |
-| --------- | --------------------------------------------------------------- | ------------- | ---------------- |
-| `days`    | 1-365                                                           | 30            | Lookback period  |
-| `metric`  | `"net_sales"` | `"gross_sales"` | `"orders"` | `"gross_profit"` | `"net_sales"` | Sort products by |
-| `limit`   | 1-50                                                            | 10            | Max results      |
-
-
-> "Which products have the best margins?" or "Show product performance with return rates"
-
-#### `shopify_traffic_sources`
-
-Session analytics by source, landing page, or daily trend.
-
-
-| Parameter | Type                                        | Default     | Description     |
-| --------- | ------------------------------------------- | ----------- | --------------- |
-| `mode`    | `"sources"` | `"landing_pages"` | `"trend"` | `"sources"` | Analysis mode   |
-| `days`    | 1-365                                       | 30          | Lookback period |
-| `limit`   | 1-50                                        | 10          | Max results     |
-
-
-> "Where is my traffic coming from?" or "What are my top landing pages?"
-
-#### `shopify_returns_analysis`
-
-Return rates, costs, and most-returned products.
-
-
-| Parameter | Type                         | Default     | Description                             |
-| --------- | ---------------------------- | ----------- | --------------------------------------- |
-| `mode`    | `"summary"` | `"by_product"` | `"summary"` | Summary totals or per-product breakdown |
-| `days`    | 1-365                        | 30          | Lookback period                         |
-| `limit`   | 1-50                         | 10          | Max results (by_product mode)           |
-
-
-> "What's my return rate?" or "Which products get returned the most?"
-
-#### `shopify_recent_orders`
-
-Most recent orders. Quick snapshot of store activity.
-
-
-| Parameter | Type | Default | Description |
-| --------- | ---- | ------- | ----------- |
-| `limit`   | 1-25 | 10      | Max results |
-
-
-> "Show me the last 10 orders"
-
-### Cross-Platform Tools
-
-#### `dtc_email_revenue_attribution`
-
-Email/SMS revenue vs total Shopify revenue. Shows email marketing contribution.
-
-
-| Parameter | Type  | Default | Description     |
-| --------- | ----- | ------- | --------------- |
-| `days`    | 1-365 | 30      | Lookback period |
-
-
-> "What percentage of my revenue came from email?"
-
-#### `dtc_dashboard`
-
-Complete DTC health dashboard: sales + email + subscriber metrics in one call.
-
-
-| Parameter | Type | Default | Description     |
-| --------- | ---- | ------- | --------------- |
-| `days`    | 7-90 | 30      | Lookback period |
-
-
-> "Give me the full business dashboard for last month"
-
-## Example Queries
-
-Here are questions you can ask Claude once dtc-mcp is connected:
-
-- "How did my email campaigns perform this month?"
-- "Which flow is generating the most revenue? Drill into the top one."
-- "Show me daily revenue for this month so I can compare against my Shopify dashboard"
-- "What's my gross vs net revenue for the past 30 days?"
-- "Which products are my best sellers this week?"
-- "Are any products running low on stock?"
-- "What percentage of my revenue comes from email marketing?"
-- "How many new vs returning customers did I have this quarter?"
-- "Show me customer cohorts by month — which has the best LTV?"
-- "Break down my customers by RFM group"
-- "What are my top countries by revenue?"
-- "Where is my traffic coming from?"
-- "What's my return rate? Which products get returned the most?"
-- "Which products have the best margins?"
-- "Give me a complete health dashboard for my business"
-- "Compare this month's sales to last month"
-- "What are my top SMS campaigns by click rate?"
-
-## Privacy Policy
-
-dtc-mcp runs locally on your machine. It does not collect, store, or transmit any user data. API credentials are stored in your local MCP client configuration and used only to authenticate directly with Klaviyo and Shopify. No analytics, telemetry, or third-party data sharing. See [PRIVACY.md](PRIVACY.md) for full details.
+Klaviyo-only mode: omit the `SHOPIFY_*` variables. `shopify.*` calls in the sandbox will throw a configuration error; `klaviyo.*` calls work normally.
+
+## Environment
+
+| Variable | Required | Description |
+|---|---|---|
+| `KLAVIYO_API_KEY` | Yes | Klaviyo private API key (`pk_...`) |
+| `SHOPIFY_STORE` | For Shopify | `*.myshopify.com` domain |
+| `SHOPIFY_CLIENT_ID` | For Shopify (Dev Dashboard) | App Client ID |
+| `SHOPIFY_CLIENT_SECRET` | For Shopify (Dev Dashboard) | App Client Secret (`shpss_...`) |
+| `SHOPIFY_ACCESS_TOKEN` | For Shopify (legacy) | Admin API token (`shpat_...`) |
+| `SHOPIFY_API_VERSION` | No | Default `2026-01` |
+| `KLAVIYO_CONVERSION_METRIC_ID` | No | Override auto-discovered "Placed Order" metric ID |
+| `DTC_MCP_DOCS_URL` | No | Override docs source (default: jsDelivr → `dtc-mcp-docs@latest`) |
+| `DTC_MCP_DOCS_REFRESH` | No | Set to `0` to disable the background docs refresh (offline mode) |
+| `LOG_LEVEL` | No | `debug` \| `info` \| `warn` \| `error` (default `info`) |
+
+## Migration from v0.2
+
+Every v0.2 tool is now one `execute_code` call. The `search_docs` index ships with recipes for the most common ones:
+
+| v0.2 tool | v1.0 recipe |
+|---|---|
+| `klaviyo_campaign_summary` | `guide.recipe.top-campaigns` — paginate `klaviyo.reporting.campaignValues`, sort, hydrate names |
+| `klaviyo_flow_summary` | `klaviyo.reporting.flowValues` (cached) + `klaviyo.flows.get` |
+| `klaviyo_subscriber_health` | `klaviyo.lists.list` + `klaviyo.segments.list` + your own engagement bucketing |
+| `shopify_sales_summary` | `shopify.ql('FROM sales SHOW gross_sales, net_sales, orders SINCE -30d UNTIL today')` |
+| `shopify_sales_timeseries` | Same ShopifyQL with `GROUP BY day` |
+| `shopify_customer_cohorts` | `shopify.gql` for `customers` + your bucketing logic |
+| `dtc_dashboard` | `guide.recipe.dashboard` — `Promise.all` of Klaviyo reporting + Shopify ShopifyQL |
+| `dtc_email_revenue_attribution` | Subset of `guide.recipe.dashboard` |
+
+Run `search_docs({ query: "<your old tool name>" })` inside Claude to find the corresponding recipe.
+
+## Token budget
+
+Tool-list payload (what every client loads on connect):
+
+| | v0.2 | v1.0 |
+|---|---|---|
+| Tools | 22 | 2 |
+| `tools/list` JSON size | ~12KB | ~1.5KB |
+| Per-conversation overhead | high (every tool's schema in context) | flat (~1KB) |
+
+v1.0 trades fixed tool-list cost for variable per-call cost (the LLM writes code that runs in the sandbox). For repeated analytics in one conversation, savings compound — the sandbox is stateful per call but the host's caches (Klaviyo reporting cache, ShopifyQL cache) persist across calls.
 
 ## Development
 
 ```bash
-git clone https://github.com/rafaelsztutman/dtc-mcp.git
-cd dtc-mcp
-npm install
-cp .env.example .env    # Fill in your API credentials
-npm run build           # Compile TypeScript
-npm test                # Run tests (46 tests)
-npm run dev             # Watch mode
-npm run inspect         # Open MCP Inspector for interactive testing
+npm install        # also builds isolated-vm via node-gyp (needs C++ toolchain)
+npm run build      # tsc → dist/
+npm run dev        # tsc --watch
+npm test           # vitest
+npm run inspect    # MCP Inspector — visual tool tester
 ```
+
+### Regenerating docs / SDK types
+
+The Klaviyo OpenAPI spec and Shopify GraphQL schema change periodically. To regenerate the bundled `data/docs.json` and the SDK types locally:
+
+```bash
+npm run codegen:klaviyo   # download Klaviyo OpenAPI → docs chunks
+npm run codegen:shopify   # introspect Shopify GraphQL → docs chunks
+npm run codegen:docs      # merge into data/docs.json
+```
+
+In production this runs daily on a GitHub Action in [dtc-mcp-docs](https://github.com/rafaelsztutman/dtc-mcp-docs); the MCP fetches the freshest copy on the next boot. Releasing a new MCP version is **not** required for new API methods to appear in `search_docs`.
 
 ## License
 
-MIT
+MIT. See `LICENSE`.

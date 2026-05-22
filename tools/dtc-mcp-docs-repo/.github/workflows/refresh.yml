@@ -1,0 +1,72 @@
+name: refresh-docs
+
+on:
+  schedule:
+    # Daily at 06:00 UTC. Klaviyo/Shopify ship spec changes during US business
+    # hours; pre-dawn UTC gives the freshest possible nightly diff to users
+    # who connect first thing in the morning.
+    - cron: "0 6 * * *"
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # We need the main repo's codegen scripts. Clone dtc-mcp here.
+          path: docs-repo
+
+      - uses: actions/checkout@v4
+        with:
+          repository: rafaelsztutman/dtc-mcp
+          ref: main
+          path: dtc-mcp
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+          cache-dependency-path: dtc-mcp/package-lock.json
+
+      - name: Install dtc-mcp deps
+        working-directory: dtc-mcp
+        run: npm ci --omit=dev || npm install
+
+      - name: Generate Klaviyo docs
+        working-directory: dtc-mcp
+        run: npm run codegen:klaviyo
+
+      - name: Generate Shopify docs
+        working-directory: dtc-mcp
+        env:
+          SHOPIFY_STORE: ${{ secrets.SHOPIFY_STORE }}
+          SHOPIFY_ACCESS_TOKEN: ${{ secrets.SHOPIFY_ACCESS_TOKEN }}
+          SHOPIFY_API_VERSION: "2026-04"
+        run: npm run codegen:shopify
+
+      - name: Build docs.json
+        working-directory: dtc-mcp
+        env:
+          DOCS_VERSION: ${{ github.run_id }}-${{ github.sha }}
+        run: npm run codegen:docs
+
+      - name: Copy artifact to docs-repo
+        run: cp dtc-mcp/data/docs.json docs-repo/docs.json
+
+      - name: Commit if changed
+        working-directory: docs-repo
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if git diff --quiet docs.json; then
+            echo "No changes."
+            exit 0
+          fi
+          git add docs.json
+          git commit -m "refresh: docs.json $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          git push
