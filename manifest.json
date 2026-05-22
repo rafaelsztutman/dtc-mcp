@@ -17,9 +17,7 @@
   "privacy_policies": [
     "https://github.com/rafaelsztutman/dtc-mcp/blob/main/PRIVACY.md"
   ],
-  "icons": [
-    { "src": "icon.png", "mimeType": "image/png", "sizes": ["512x512"] }
-  ],
+  "icon": "icon.png",
   "server": {
     "type": "node",
     "entry_point": "server/bootstrap.cjs",
