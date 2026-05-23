@@ -62,6 +62,7 @@ export function registerExecuteCode(server: McpServer): void {
           ...(result.ok ? { result: result.result } : { error: result.error }),
           stdout: result.stdout,
           durationMs: result.durationMs,
+          sandbox: result.sandbox,
         },
         null,
         2,

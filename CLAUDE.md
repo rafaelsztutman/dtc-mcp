@@ -23,9 +23,14 @@ src/
     execute_code.ts     # MCP tool: runs user code in the sandbox
     search_docs.ts      # MCP tool: searches the docs index
   sandbox/
-    runner.ts           # isolated-vm bootstrap + sucrase TS strip
+    runner.ts           # public entry — routes between sidecar and vm
+    vm-runner.ts        # node:vm in-process fallback
+    sidecar-runner.ts   # manages the sidecar child process lifecycle
+    sidecar/index.ts    # sidecar entrypoint — spawned in system Node, loads isolated-vm
+    protocol.ts         # NDJSON message shapes shared between main and sidecar
+    node-discovery.ts   # finds system Node ≥ 20 across PATH/Homebrew/nvm/volta/fnm/asdf
     bridge.ts           # host-side method registry — every SDK path lives here
-    proxy-template.ts   # in-isolate JS that mirrors bridge as `klaviyo`/`shopify` globals
+    proxy-template.ts   # in-isolate JS for node:vm (sidecar has its own embedded version)
     timeout.ts          # `// @timeout` annotation parser
   sdk/
     klaviyo/host.ts     # host-side Klaviyo client: rate limiter + caches + metric ID discovery
@@ -44,10 +49,18 @@ tools/codegen/          # build-time spec → SDK types + docs.json
 ## Key invariants
 
 1. **Sandbox has no escape hatches.** No `fetch`, `process`, `require`, `import`, `setTimeout`. Only `klaviyo`, `shopify`, `console`, plus standard JS globals (`Date`, `JSON`, `Math`, `Promise`, etc.).
-2. **All API access goes through the host bridge** (`src/sandbox/bridge.ts`). To add a new SDK method, register it in the `handlers` map there. The proxy template auto-mirrors the registry as a namespace tree inside the isolate.
-3. **Rate limiting and caching live on the host side** — never in the sandbox. The sandbox can't cache across calls (fresh isolate each invocation), so the host carries that state.
-4. **Lazy per-field env validation** (`config.ts`). Never throw at module load — return empty strings + warn. Tools surface actionable errors when actually invoked. Critical for Claude Desktop where missing env vars shouldn't crash the server.
-5. **TS support via sucrase**, not regex stripping. Sucrase is the smallest viable transpiler; do not roll our own.
+2. **All API access goes through the host bridge** (`src/sandbox/bridge.ts`). To add a new SDK method, register it in the `handlers` map there. Both runners mirror the registry as a namespace tree.
+3. **Rate limiting and caching live on the host side** — never in the sandbox. Fresh isolate per invocation (sidecar) means no cross-call state. The main MCP server carries it.
+4. **isolated-vm cannot load directly in Claude Desktop** because of macOS Library Validation. It MUST be loaded by a spawned system Node process — the sidecar. Don't move the `isolated-vm` import into the main process.
+5. **The main MCP server (Electron Node) does NOT import isolated-vm.** Only `src/sandbox/sidecar/index.ts` does, and it's loaded only when system Node spawns it. Keep this isolation — if isolated-vm appears in `dist/server.js` or `dist/index.js`'s closure graph, Electron will fail to load the bundle.
+6. **Lazy per-field env validation** (`config.ts`). Never throw at module load — return empty strings + warn. Tools surface actionable errors when actually invoked. Critical for Claude Desktop where missing env vars shouldn't crash the server.
+7. **TS support via sucrase**, not regex stripping. Sucrase is the smallest viable transpiler; do not roll our own.
+
+## Why the sidecar exists
+
+Claude Desktop is built on Electron with macOS hardened runtime + Library Validation. The host process can only load native modules signed with Anthropic's Team ID. We can't sign with their cert, and ad-hoc signatures have no Team ID. Workaround: spawn a separate Node process from the user's system `node` binary. The child process has its own (unrestricted) hardened-runtime status, so isolated-vm loads freely there. Main MCP server and sidecar talk via newline-delimited JSON-RPC over stdio, with bidirectional message correlation so the in-isolate proxy can round-trip host bridge calls back to the main process where the rate-limited Klaviyo/Shopify clients live.
+
+If a user doesn't have Node ≥ 20 installed, discovery fails and the runner falls back to in-process `node:vm` (weaker isolation, but works for everyone). The active mode is in every tool result as `sandbox: "sidecar" | "vm"`.
 
 ## Klaviyo rate limits (critical)
 

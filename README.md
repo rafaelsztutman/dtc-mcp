@@ -9,15 +9,19 @@ Inspired by [Stainless's code-execution MCP architecture](https://www.stainless.
 ## The two tools
 
 ### `execute_code`
-Runs JavaScript (TypeScript syntax supported, stripped via [sucrase](https://github.com/alangpierce/sucrase)) inside a fresh [isolated-vm](https://github.com/laverdet/isolated-vm) V8 isolate. Globals exposed:
+Runs JavaScript (TypeScript syntax supported, stripped via [sucrase](https://github.com/alangpierce/sucrase)) inside a **hybrid sandbox**:
 
+- **Preferred runner — sidecar [isolated-vm](https://github.com/laverdet/isolated-vm)**: a fresh V8 isolate per call (separate heap, 128 MB hard limit, hard timeout). The sidecar is a child Node process spawned at MCP server startup from the user's system Node binary. This indirection exists because Claude Desktop is Electron + macOS hardened runtime + Library Validation, which refuses to dlopen native modules whose code signature doesn't share Anthropic's Team ID. See **Sandbox architecture** below.
+- **Fallback runner — `node:vm`**: in-process sandbox. Activates automatically when no system Node ≥ 20 is found, or when the sidecar crashes. Weaker isolation but no extra requirements. Each result includes a `sandbox` field so the LLM (and you) can see which mode ran.
+
+Globals exposed in both modes:
 - `klaviyo` — typed client wrapping the Klaviyo REST API (`get`, `post`, `paginate`, plus `campaigns`, `flows`, `lists`, `segments`, `profiles`, `events`, `metrics`, `reporting.{campaignValues,flowValues}`)
 - `shopify` — typed client for Shopify Admin GraphQL + ShopifyQL (`gql`, `ql`, `timezone`)
 - `console.{log,error,warn,info}` — captured and returned to the caller as `stdout`
 
 The host applies rate limiting, auth, and caching transparently — Klaviyo's dual-tier limiter (1/s reporting, 10/s standard), Shopify's GraphQL cost budget, and a 10-min reporting POST cache all carry over from v0.2's battle-tested implementations.
 
-Defaults: 30s wall-clock, 128MB heap. Opt-in `// @timeout 2m` (max 5m).
+Defaults: 30s wall-clock, 128 MB heap (sidecar only). Opt-in `// @timeout 2m` (max 5m).
 
 ```js
 // Top 5 email campaigns by revenue, last 30 days, with names hydrated.
@@ -44,31 +48,53 @@ Searches the bundled SDK reference (MiniSearch / BM25) for method signatures, pa
 
 Docs are auto-refreshed daily from [dtc-mcp-docs](https://github.com/rafaelsztutman/dtc-mcp-docs) via jsDelivr CDN (with ETag negotiation). New Klaviyo / Shopify API revisions land without a new MCP release.
 
-## Architecture
+## Sandbox architecture
+
+The preferred sandbox runs `isolated-vm` in a sidecar process. Why a sidecar:
+
+> Claude Desktop is an Electron app whose main binary is signed with hardened
+> runtime + macOS Library Validation. Native modules loaded into Claude
+> Desktop must share Anthropic's Team ID. We can't sign `isolated-vm` with
+> Anthropic's cert, and ad-hoc signing has no Team ID — so the native module
+> is refused at `dlopen`. A child process spawned from the user's system
+> `node` binary has its own (unrestricted) hardened-runtime status, so
+> isolated-vm loads cleanly there.
 
 ```
-┌─ dtc-mcp v1.0 (stdio MCP server) ──────────────────────┐
-│                                                         │
-│  execute_code ──→ isolated-vm V8 isolate                │
-│                   ├ klaviyo proxy ──┐                   │
-│                   ├ shopify proxy ──┼→ host bridge      │
-│                   └ console capture │                   │
-│                                     ▼                   │
-│                              ┌─ host SDK ─────────┐     │
-│                              │ - Klaviyo rate     │     │
-│                              │   limiter + cache  │     │
-│                              │ - Shopify token    │     │
-│                              │   mgr + cost track │     │
-│                              └────────────────────┘     │
-│                                     │                   │
-│  search_docs ──→ MiniSearch ◄───────┘  HTTP             │
-│                  in-memory          (Klaviyo, Shopify)  │
-│                  index of docs.json                     │
-│                                                         │
-└─────────────────────────────────────────────────────────┘
+┌─ Claude Desktop (Electron, hardened runtime) ────────────────┐
+│                                                               │
+│  Main MCP server (Electron's bundled Node)                    │
+│  ├ search_docs       MiniSearch BM25 over data/docs.json      │
+│  ├ execute_code      proxies to ↓                             │
+│  ├ host SDK          Klaviyo + Shopify clients (rate limit,   │
+│  │                   auth, cache — same code as v0.2)         │
+│  └ sidecar manager   spawn / lifecycle / NDJSON over stdio    │
+│                                                               │
+└─────────────────────────────│─────────────────────────────────┘
+                              │ newline-delimited JSON-RPC
+┌─ Sidecar (system /usr/local/bin/node — outside Electron) ────┐
+│                                                               │
+│  isolated-vm loads (no Library Validation here)               │
+│                                                               │
+│  Per execute request:                                         │
+│  ┌─ Fresh V8 isolate ───────────────────────────────────┐    │
+│  │ • 128 MB heap limit, hard wall-clock timeout         │    │
+│  │ • No fetch / process / require / fs / env / globals  │    │
+│  │ • klaviyo + shopify proxies → __host_invoke ────────╮│    │
+│  │ • console capture → stdout                          ││    │
+│  └─────────────────────────────────────────────────────╯│    │
+│                                                          │    │
+└──────────────────────────────────────────────────────────│────┘
+                                                           │
+                                          (host-call round-trip
+                                           back to main MCP for
+                                           the actual HTTP call,
+                                           rate-limited there)
 ```
 
-The sandbox has **no `fetch`, no `process`, no filesystem, no env**. The only way out is the host bridge, which validates every call against a method registry — unknown paths are rejected.
+If discovery fails (no Node ≥ 20 on the system) or the sidecar crashes, `execute_code` automatically falls back to an in-process `node:vm` runner with documented threat-model caveats (mistake fence, not a security boundary). The tool result includes a `sandbox: "sidecar"` or `sandbox: "vm"` field so the LLM (and you) can see which mode ran.
+
+Node discovery checks (in order): `DTC_MCP_NODE_PATH` env var → `which node` / `where node` → Homebrew (both archs) → standard system paths → nvm → Volta → fnm → asdf. Set `DTC_MCP_SANDBOX=vm` to force the in-process fallback, or `DTC_MCP_SANDBOX=sidecar` to require the sidecar.
 
 ## Quick start
 
@@ -123,6 +149,8 @@ Klaviyo-only mode: omit the `SHOPIFY_*` variables. `shopify.*` calls in the sand
 | `KLAVIYO_CONVERSION_METRIC_ID` | No | Override auto-discovered "Placed Order" metric ID |
 | `DTC_MCP_DOCS_URL` | No | Override docs source (default: jsDelivr → `dtc-mcp-docs@latest`) |
 | `DTC_MCP_DOCS_REFRESH` | No | Set to `0` to disable the background docs refresh (offline mode) |
+| `DTC_MCP_SANDBOX` | No | `auto` (default) \| `sidecar` (require isolated-vm) \| `vm` (force `node:vm`) |
+| `DTC_MCP_NODE_PATH` | No | Absolute path to the Node binary used by the sidecar. Skips discovery. |
 | `LOG_LEVEL` | No | `debug` \| `info` \| `warn` \| `error` (default `info`) |
 
 ## Migration from v0.2

@@ -1,20 +1,19 @@
 /**
- * Build the JavaScript source that runs INSIDE the isolated-vm isolate to
+ * Build the JavaScript source that runs INSIDE the `node:vm` context to
  * reconstruct the `klaviyo` and `shopify` namespace trees as thin async stubs.
  *
- * Each leaf method serializes its args, calls back into the host via the
- * `__host_invoke` Reference, and awaits the host's promise. The host re-runs
- * the request with real rate limiting, auth, and caching.
+ * Each leaf method serializes its args to JSON, calls the host bridge function
+ * (`__host_invoke`) injected into the context, and awaits the host's promise.
+ * The host re-runs the request with real rate limiting, auth, and caching.
  *
- * Args travel as JSON strings rather than via isolated-vm's `arguments.copy`
- * option. JSON is more predictable across the boundary for arbitrary user
- * payloads (no edge cases around symbols, functions, or class instances) and
- * is plenty fast at the sizes we deal with.
+ * JSON-encoded args are used (rather than passing the raw array) because:
+ *   - `node:vm` shares the V8 heap with the host, so objects could leak the
+ *     prototype chain across the boundary if passed directly. JSON normalizes
+ *     everything to plain data.
+ *   - Behavior matches what we'd do across a worker boundary if we later
+ *     swap the runtime for a stricter sandbox.
  */
 export function buildProxyScript(methodPaths: string[]): string {
-  // Build a nested object literal from dotted paths.
-  // ["klaviyo.get", "klaviyo.campaigns.list", "shopify.gql"] →
-  //   { klaviyo: { get: ..., campaigns: { list: ... } }, shopify: { gql: ... } }
   type Node = { [key: string]: Node | string };
   const tree: Node = {};
   for (const path of methodPaths) {
@@ -46,11 +45,8 @@ export function buildProxyScript(methodPaths: string[]): string {
 (function () {
   const __invoke = async function (path, args) {
     const argsJson = JSON.stringify(args);
-    const resultJson = await __host_invoke.apply(undefined, [path, argsJson], {
-      arguments: { copy: false },
-      result: { promise: true }
-    });
-    if (resultJson && resultJson.startsWith('__ERROR__')) {
+    const resultJson = await __host_invoke(path, argsJson);
+    if (typeof resultJson === 'string' && resultJson.startsWith('__ERROR__')) {
       throw new Error(resultJson.slice(9));
     }
     return resultJson ? JSON.parse(resultJson) : undefined;

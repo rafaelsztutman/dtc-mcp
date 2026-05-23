@@ -1,16 +1,19 @@
 import { describe, it, expect, beforeAll } from "vitest";
 
 beforeAll(() => {
-  // Set minimal env before any module-level config evaluation.
   process.env.KLAVIYO_API_KEY = process.env.KLAVIYO_API_KEY ?? "pk_test_dummy";
+  // Force the vm-runner so this test file is hermetic — sidecar tests run
+  // separately in tests/sidecar.test.ts.
+  process.env.DTC_MCP_SANDBOX = "vm";
 });
 
-describe("sandbox runner", () => {
+describe("sandbox runner (vm fallback)", () => {
   it("runs trivial code and returns the value", async () => {
     const { runSandbox } = await import("../src/sandbox/runner.js");
     const result = await runSandbox("return 2 + 2;", { timeoutMs: 5000 });
     expect(result.ok).toBe(true);
     expect(result.result).toBe(4);
+    expect(result.sandbox).toBe("vm");
   });
 
   it("captures console.log into stdout", async () => {
@@ -24,7 +27,7 @@ describe("sandbox runner", () => {
     expect(result.stdout).toEqual(["hello", "world 42"]);
   });
 
-  it("denies fetch, process, require, import inside the isolate", async () => {
+  it("denies fetch, process, require, import inside the sandbox", async () => {
     const { runSandbox } = await import("../src/sandbox/runner.js");
     const checks = await runSandbox(
       `
@@ -97,8 +100,7 @@ describe("sandbox runner", () => {
     const result = await runSandbox(
       `
         try {
-          // Manually invoke an unknown path through the proxy.
-          await klaviyo.campaigns.list({});  // valid path; will fail at the API since we have a dummy key.
+          await klaviyo.campaigns.list({});
           return "ok";
         } catch (e) {
           return { caught: true, message: String(e.message).slice(0, 80) };
@@ -106,8 +108,6 @@ describe("sandbox runner", () => {
       `,
       { timeoutMs: 8000 },
     );
-    // Either succeeded somehow (unlikely with dummy key) or caught — both prove
-    // the bridge actually invoked. The point of this test is the proxy works.
     expect(result.ok).toBe(true);
   });
 });

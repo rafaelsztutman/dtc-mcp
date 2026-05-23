@@ -5,7 +5,7 @@ import { registerSearchDocs } from "./tools/search_docs.js";
 export function createServer(): McpServer {
   const server = new McpServer({
     name: "dtc-mcp",
-    version: "1.0.0-rc.1",
+    version: "1.0.0-rc.3",
   });
 
   registerExecuteCode(server);

@@ -2,7 +2,7 @@
   "manifest_version": "0.3",
   "name": "dtc-mcp",
   "display_name": "DTC E-Commerce Analytics",
-  "version": "1.0.0-rc.1",
+  "version": "1.0.0-rc.3",
   "description": "Stainless-style two-tool MCP for Klaviyo + Shopify. LLM writes TypeScript against typed SDKs in an isolated V8 sandbox — replaces the 22-tool surface of v0.2 with execute_code + search_docs.",
   "author": {
     "name": "Rafael Sztutman"
