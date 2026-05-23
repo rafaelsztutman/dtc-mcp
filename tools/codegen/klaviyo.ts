@@ -62,6 +62,12 @@ async function main(): Promise<void> {
         })
         .slice(0, 30); // cap so chunks stay scannable
 
+      // SDK example: the `klaviyo.get` / `klaviyo.post` SDK already prepends
+      // the `/api/` base URL, so the example needs to strip the leading
+      // `api/` from the OpenAPI path (e.g. `/api/campaign-messages/{id}` →
+      // `campaign-messages/{id}`). Without this strip the LLM writes
+      // `klaviyo.get('api/...')` and gets a `/api/api/...` 404 on the wire.
+      const sdkPath = path.replace(/^\//, "").replace(/^api\//, "");
       const content = [
         `## ${method.toUpperCase()} ${path}`,
         "",
@@ -70,7 +76,7 @@ async function main(): Promise<void> {
         params.length ? "**Parameters:**" : "",
         ...params,
         "",
-        `Use \`klaviyo.${method === "get" ? "get" : "post"}('${path.replace(/^\//, "")}', ...)\` to call this endpoint.`,
+        `Use \`klaviyo.${method === "get" ? "get" : "post"}('${sdkPath}', ...)\` to call this endpoint. (Note: the SDK auto-prepends \`/api/\`, so do NOT include it in the path argument.)`,
       ]
         .filter((line) => line !== undefined)
         .join("\n");
