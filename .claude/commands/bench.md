@@ -41,29 +41,36 @@ this command coordinates them and the deterministic bookkeeping CLI.
    plan. Parse it — it's an array of pending cells, each with a fully-built
    sub-agent prompt.
 
-5. **For each cell in the plan** (parallel up to 3 concurrent, sequential
-   within a single task across MCPs to keep Klaviyo API load fair):
-   a. Capture `startedAt = new Date().toISOString()`.
-   b. Spawn a sub-agent via the `Agent` tool. Use `subagent_type: claude`,
+5. **For each cell in the plan — STRICTLY SEQUENTIAL**, one at a time.
+   Klaviyo's API will flag bursty access; the harness intentionally paces
+   itself. The plan JSON includes a `delayBeforeMs` field on every cell:
+   wait that many milliseconds BEFORE spawning the cell's sub-agent. Do
+   NOT run sub-agents in parallel for this benchmark — even though the
+   `Agent` tool supports it.
+
+   a. **Wait `delayBeforeMs` milliseconds** (skip on the first cell of
+      a batch — there's nothing to space from).
+   b. Capture `startedAt = new Date().toISOString()`.
+   c. Spawn a sub-agent via the `Agent` tool. Use `subagent_type: claude`,
       `description` from the plan, `prompt` from the plan. The sub-agent
       will run autonomously and return a single JSON object as its message.
-   c. Capture `finishedAt`.
-   d. Parse the sub-agent's return message. It MUST conform to:
+   d. Capture `finishedAt`.
+   e. Parse the sub-agent's return message. It MUST conform to:
       ```
       { "final_answer": <string>, "claims": [<strings>],
         "tool_calls": <int>, "succeeded": <bool>, "errors": [<strings>] }
       ```
-   e. **Capture the full trajectory.** The sub-agent's actual MCP tool
+   f. **Capture the full trajectory.** The sub-agent's actual MCP tool
       calls are visible in its returned transcript. Parse them into a
       `Trajectory` with each tool's `name`, `input`, `output`. Don't worry
       about exact byte counts — the CLI fills those in on record.
-   f. Write the result to a temp file under `bench/results/<runId>/tmp/<cellId>.json`:
+   g. Write the result to a temp file under `bench/results/<runId>/tmp/<cellId>.json`:
       ```
       { "trajectory": { "toolCalls": [...], "rawResponse": "...", "durationMs": <number> },
         "report": { "final_answer": ..., "claims": [...], "tool_calls": ..., "succeeded": ..., "errors": [...] },
         "startedAt": "...", "finishedAt": "..." }
       ```
-   g. Run `tsx bench/runner/cli.ts record --cell <cellId> <tmpfile>` to
+   h. Run `tsx bench/runner/cli.ts record --cell <cellId> <tmpfile>` to
       persist + estimate tokens + check constraint violations.
 
 6. **After all cells in the batch are recorded**, run

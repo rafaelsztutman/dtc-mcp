@@ -110,10 +110,21 @@ bench/
 
 ### Why batches (A–F)
 
-Sub-agents consume Max-plan quota. A full run is ~90 cells × ~30s each ≈ 45 min of sub-agent time; even at modest concurrency that can exhaust a 5-hour quota window. The 6-batch split lets the user:
+Sub-agents consume Max-plan quota. A full run is ~90 cells × ~40s each ≈ 60 min of sub-agent time at strictly sequential pacing (see below); even one batch is meaningful in isolation. The 6-batch split lets the user:
 - Pause between batches as quota allows
 - Inspect intermediate state and abort if early results look bogus
 - Resume cleanly from `state.json` after restart
+
+### Strictly sequential, deliberately slow
+
+The benchmark hits a live Klaviyo account. Bursty access could trip rate-limit detection and (worse) flag the account. To stay below the radar:
+
+- **`concurrency: 1`** by default — one sub-agent at a time. Never parallel.
+- **`baseDelayMs: 3000`** — minimum 3-second gap between any two cells.
+- **`reportingDelayMs: 8000`** — extra 8-second gap before any cell that hits Klaviyo's `campaign-values-reports` or `flow-values-reports` endpoints (those tiers are throttled at 1/s burst, 2/min sustained).
+- **`mcpSwitchDelayMs: 10000`** — extra 10-second gap when switching between dtc-mcp and klaviyo-mcp cells, since both share the same per-account budget.
+
+Per-cell pacing is computed by `bench/runner/cli.ts plan` and surfaced to the sub-agent runner. Total estimated wall-clock per batch is in the plan JSON's `totalEstSeconds` field. Pacing settings live in `state.json` under `pacing` so they can be tweaked per-run.
 
 ### Why claims-based grading
 

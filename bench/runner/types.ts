@@ -66,6 +66,8 @@ export interface Task {
   applies_to?: Mcp[];
   /** Free-form notes for humans. Not used by the runner. */
   notes?: string;
+  /** Hints to the runner: does this task hit reporting endpoints? Drives pacing. */
+  reportingHeavy?: boolean;
 }
 
 // ─── Per-cell runtime state (one cell = one task × one MCP × one trial) ──
@@ -166,6 +168,19 @@ export interface RunState {
   tokenTariff: number;
   /** Static MCP metadata captured at init time (tool counts, schema bytes). */
   mcpMetadata: Record<Mcp, McpMetadata>;
+  /** Pacing config — drives sequential execution against Klaviyo's API. */
+  pacing: PacingConfig;
+}
+
+export interface PacingConfig {
+  /** Max concurrent sub-agents per batch. Default 1 (strictly sequential) to keep Klaviyo happy. */
+  concurrency: number;
+  /** Minimum gap between consecutive cells (ms). */
+  baseDelayMs: number;
+  /** Extra gap added BEFORE a reporting-heavy cell (Klaviyo's reporting endpoints are 1/s). */
+  reportingDelayMs: number;
+  /** Extra gap when switching from one MCP to the other. */
+  mcpSwitchDelayMs: number;
 }
 
 export interface McpMetadata {

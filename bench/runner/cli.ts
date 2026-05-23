@@ -30,6 +30,7 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
   cellIdFor,
+  delayBeforeCell,
   findOrCreateRunDir,
   initState,
   parseCellId,
@@ -144,6 +145,7 @@ async function cmdPlan(args: { batch: Batch; limit?: number }): Promise<void> {
     return;
   }
 
+  let prev: CellResult | undefined;
   const plan = pending.map((cell) => {
     const task = taskById.get(cell.taskId);
     if (!task) {
@@ -154,19 +156,38 @@ async function cmdPlan(args: { batch: Batch; limit?: number }): Promise<void> {
     }
     const metadata = state.mcpMetadata[cell.mcp];
     const subAgent = buildSubAgentPrompt(task, cell.mcp, cell.trial, metadata);
+    const delay = delayBeforeCell(cell, prev, task, state.pacing);
+    prev = cell;
     return {
       cellId: cell.cellId,
       mcp: cell.mcp,
       taskId: cell.taskId,
       trial: cell.trial,
       prefix: MCP_PREFIX[cell.mcp],
+      delayBeforeMs: delay,
+      reportingHeavy: !!task.reportingHeavy,
       description: subAgent.description,
       prompt: subAgent.prompt,
     };
   });
 
   // Print as JSON so the Claude Code-side caller can read it cleanly.
-  console.log(JSON.stringify({ runDir, batch: args.batch, plan }, null, 2));
+  console.log(
+    JSON.stringify(
+      {
+        runDir,
+        batch: args.batch,
+        pacing: state.pacing,
+        plan,
+        totalEstSeconds: plan.reduce(
+          (sum, p) => sum + ("delayBeforeMs" in p ? (p.delayBeforeMs ?? 0) / 1000 : 0) + 30,
+          0,
+        ),
+      },
+      null,
+      2,
+    ),
+  );
 }
 
 async function cmdRecord(args: {

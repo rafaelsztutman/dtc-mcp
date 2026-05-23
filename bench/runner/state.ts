@@ -8,9 +8,24 @@ import type {
   CellResult,
   Mcp,
   McpMetadata,
+  PacingConfig,
   RunState,
   Task,
 } from "./types.js";
+
+/**
+ * Default pacing — strictly sequential, with extra breathing room for
+ * Klaviyo's tier-throttled reporting endpoints (1/s burst, 2/min sustained
+ * on `campaign-values-reports` and `flow-values-reports`). The benchmark
+ * runs against a real production account; getting flagged would be a much
+ * bigger problem than a slow benchmark.
+ */
+const DEFAULT_PACING: PacingConfig = {
+  concurrency: 1,           // one sub-agent at a time, full stop
+  baseDelayMs: 3000,        // 3s pause between any two cells
+  reportingDelayMs: 8000,   // +8s before a reporting-heavy task (=11s total)
+  mcpSwitchDelayMs: 10000,  // +10s when flipping dtc-mcp ↔ klaviyo-mcp
+};
 
 /**
  * State.json is the single source of truth for a benchmark run. Every
@@ -123,7 +138,25 @@ export function initState(
     cells,
     tokenTariff: 4, // bytes per token estimate; calibrated in Phase 2
     mcpMetadata,
+    pacing: { ...DEFAULT_PACING },
   };
+}
+
+/** Compute the delay that should be applied BEFORE the next cell runs. */
+export function delayBeforeCell(
+  next: CellResult,
+  prev: CellResult | undefined,
+  task: Task | undefined,
+  pacing: PacingConfig,
+): number {
+  let delay = pacing.baseDelayMs;
+  if (task?.reportingHeavy) {
+    delay += pacing.reportingDelayMs;
+  }
+  if (prev && prev.mcp !== next.mcp) {
+    delay += pacing.mcpSwitchDelayMs;
+  }
+  return delay;
 }
 
 /**
