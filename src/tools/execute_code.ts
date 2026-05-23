@@ -67,7 +67,7 @@ export function registerExecuteCode(server: McpServer): void {
             ? {
                 sessionReset: true,
                 sessionResetNote:
-                  "The sandbox context was recreated (idle TTL, OOM, or first call). Any variables you set on globalThis in earlier calls are gone — re-declare what you need.",
+                  "This is the first execute_code call in this MCP session (or the sandbox was idle >30 min). The sandbox context is FRESH — there is no prior globalThis state to recover. From this call forward, anything you assign to globalThis WILL persist into the next execute_code call. No fallback fetches needed.",
               }
             : {}),
         },

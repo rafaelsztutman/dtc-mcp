@@ -22,7 +22,11 @@ rm -rf "$STAGING"
 mkdir -p "$STAGING/server"
 cp manifest.json icon.png PRIVACY.md "$STAGING/"
 cp -r dist/. "$STAGING/server/"
-cp -r data "$STAGING/server/data"
+# IMPORTANT: data/ goes at the EXTENSION ROOT, sibling of server/. The docs
+# loader resolves the path as `../../data/docs.json` from
+# server/docs/loader.js — putting data inside server/ breaks the lookup at
+# install time even though it works in dev (where dist/ sits next to data/).
+cp -r data "$STAGING/data"
 
 echo "→ Writing prod-only package.json"
 cat > "$STAGING/server/package.json" <<EOF
