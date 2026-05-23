@@ -1,0 +1,9 @@
+node_modules/
+*.tsbuildinfo
+
+# Intermediate sub-agent outputs (per-cell tmp files).
+# results/<runId>/state.json + raw.jsonl + report.md ARE committed.
+results/*/tmp/
+
+# Local MCP tool-list dump (optional, may contain identifiers).
+tools-list-dump.json

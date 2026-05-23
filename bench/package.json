@@ -1,0 +1,19 @@
+{
+  "name": "dtc-mcp-bench",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Head-to-head benchmark harness comparing dtc-mcp vs Klaviyo's official MCP. Driven by Claude Code sub-agents — no Anthropic API access required.",
+  "type": "module",
+  "scripts": {
+    "cli": "tsx runner/cli.ts",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "tsx": "^4.19.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "typescript": "^5.5.0",
+    "vitest": "^2.0.0"
+  }
+}
