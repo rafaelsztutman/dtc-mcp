@@ -1,6 +1,6 @@
 {
   "name": "dtc-mcp",
-  "version": "1.0.0-rc.3",
+  "version": "1.0.0-rc.4",
   "description": "Stainless-style two-tool MCP server for DTC e-commerce. Replaces 22 hand-built tools with execute_code + search_docs — LLM writes TypeScript against typed Klaviyo + Shopify SDKs in an isolated V8 sandbox.",
   "type": "module",
   "bin": {

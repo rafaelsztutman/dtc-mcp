@@ -1,3 +1,5 @@
+import { SANDBOX_HELPERS_SOURCE } from "./sandbox-helpers.js";
+
 /**
  * Build the JavaScript source that runs INSIDE the `node:vm` context to
  * reconstruct the `klaviyo` and `shopify` namespace trees as thin async stubs.
@@ -12,6 +14,9 @@
  *     everything to plain data.
  *   - Behavior matches what we'd do across a worker boundary if we later
  *     swap the runtime for a stricter sandbox.
+ *
+ * The bootstrap also installs the output-discipline helpers (`pick`,
+ * `summarize`, `topN`) — see ./sandbox-helpers.ts.
  */
 export function buildProxyScript(methodPaths: string[]): string {
   type Node = { [key: string]: Node | string };
@@ -68,11 +73,14 @@ export function buildProxyScript(methodPaths: string[]): string {
     },
   };
   globalThis.__getStdout = () => __stdout;
+  globalThis.__resetStdout = () => { __stdout.length = 0; };
 
   const __sdk = ${emit(tree)};
   for (const k of Object.keys(__sdk)) {
     globalThis[k] = __sdk[k];
   }
 })();
+
+${SANDBOX_HELPERS_SOURCE}
 `;
 }

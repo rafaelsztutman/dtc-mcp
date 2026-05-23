@@ -89,3 +89,60 @@ export async function search(
 
   return { version: st.version, hits };
 }
+
+export interface DocByIdResult {
+  version: string;
+  found: boolean;
+  chunk?: DocChunk;
+}
+
+/**
+ * Fetch one chunk by exact ID. Used by the `read_doc` MCP tool — Anthropic's
+ * "filesystem-as-API" pattern adapted to the docs layer. Cheaper and more
+ * deterministic than `search` when the LLM already knows the path.
+ */
+export async function readById(id: string): Promise<DocByIdResult> {
+  const st = await ensureIndex();
+  const chunk = st.chunks.get(id);
+  return {
+    version: st.version,
+    found: !!chunk,
+    chunk,
+  };
+}
+
+export interface DocListResult {
+  version: string;
+  count: number;
+  paths: Array<{
+    id: string;
+    title: string;
+    platform: string;
+    category: string;
+    summary: string;
+  }>;
+}
+
+/**
+ * List all chunk IDs (with one-line summaries). Used by `read_doc()` with no
+ * argument so the LLM can discover what's available without a search query.
+ */
+export async function listPaths(
+  options: { platform?: string } = {},
+): Promise<DocListResult> {
+  const st = await ensureIndex();
+  const platform = options.platform?.toLowerCase();
+  const paths: DocListResult["paths"] = [];
+  for (const chunk of st.chunks.values()) {
+    if (platform && chunk.platform.toLowerCase() !== platform) continue;
+    paths.push({
+      id: chunk.id,
+      title: chunk.title,
+      platform: chunk.platform,
+      category: chunk.category,
+      summary: chunk.summary,
+    });
+  }
+  paths.sort((a, b) => a.id.localeCompare(b.id));
+  return { version: st.version, count: paths.length, paths };
+}

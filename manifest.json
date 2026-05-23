@@ -2,7 +2,7 @@
   "manifest_version": "0.3",
   "name": "dtc-mcp",
   "display_name": "DTC E-Commerce Analytics",
-  "version": "1.0.0-rc.3",
+  "version": "1.0.0-rc.4",
   "description": "Stainless-style two-tool MCP for Klaviyo + Shopify. LLM writes TypeScript against typed SDKs in an isolated V8 sandbox — replaces the 22-tool surface of v0.2 with execute_code + search_docs.",
   "author": {
     "name": "Rafael Sztutman"
@@ -78,11 +78,15 @@
   "tools": [
     {
       "name": "execute_code",
-      "description": "Run TypeScript-like JavaScript against typed Klaviyo + Shopify SDKs in an isolated V8 sandbox. Replaces 22 hand-built tools with arbitrary composability."
+      "description": "Run TypeScript-like JavaScript against typed Klaviyo + Shopify SDKs in a stateful V8 sandbox. Variables on globalThis persist across calls within the same MCP connection."
     },
     {
       "name": "search_docs",
-      "description": "Search SDK reference docs for Klaviyo and Shopify methods exposed in the sandbox. Use before writing code in execute_code."
+      "description": "Search SDK reference docs for Klaviyo and Shopify methods. Use when discovering methods by intent."
+    },
+    {
+      "name": "read_doc",
+      "description": "Fetch one docs chunk by path, or list all available paths. Use when you already know the chunk ID — faster than search_docs."
     }
   ]
 }

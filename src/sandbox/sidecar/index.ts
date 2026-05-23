@@ -15,6 +15,7 @@
  */
 
 import { createInterface } from "node:readline";
+import { SANDBOX_HELPERS_SOURCE } from "../sandbox-helpers.js";
 import type {
   ExecuteRequestMessage,
   HostCallResponseMessage,
@@ -61,6 +62,27 @@ const pendingHostCalls = new Map<
   string, // `${execId}:${callId}`
   (resultJson: string) => void
 >();
+
+// ---- Stateful session ----
+//
+// One isolate per sidecar process = one MCP connection. Bootstrap runs once;
+// each execute reuses the same context so user variables (`globalThis.x =
+// ...`) persist across calls. After 30 min idle the isolate is disposed and
+// the next execute recreates it with `sessionReset: true` in the result.
+const IDLE_TTL_MS = 30 * 60_000;
+const HEAP_LIMIT_MB = 256;
+
+interface IsolateSession {
+  isolate: import("isolated-vm").Isolate;
+  context: import("isolated-vm").Context;
+  callCounter: number;
+}
+
+let session: IsolateSession | null = null;
+let idleTimer: NodeJS.Timeout | null = null;
+// Pulls the current execute's id so the host-call bridge can tag outbound
+// messages. Set in handleExecute before user code runs.
+let currentExecId: string | null = null;
 
 const rl = createInterface({ input: process.stdin, crlfDelay: Infinity });
 rl.on("line", (line) => {
@@ -111,58 +133,123 @@ function handleHostResult(msg: HostCallResponseMessage): void {
   resolver(msg.resultJson);
 }
 
+async function ensureSession(): Promise<{ wasReset: boolean }> {
+  if (session && !session.isolate.isDisposed) {
+    refreshIdleTimer();
+    return { wasReset: false };
+  }
+  if (!proxyScript) {
+    throw new Error("Sidecar not initialized (missing init message)");
+  }
+  logErr("creating new isolate session");
+  const isolate = new ivm.Isolate({ memoryLimit: HEAP_LIMIT_MB });
+  const context = await isolate.createContext();
+  const jail = context.global;
+  await jail.set("global", jail.derefInto());
+
+  // The host-bridge Reference is installed ONCE on the persistent context.
+  // It reads currentExecId at call time so calls across executes get tagged
+  // with their owning execute's id.
+  const invokeRef = new ivm.Reference(
+    async (path: string, argsJson: string) => {
+      const execId = currentExecId;
+      if (!execId) {
+        return `__ERROR__host call made outside of an execute context`;
+      }
+      const s = session;
+      if (!s) {
+        return `__ERROR__session unavailable`;
+      }
+      const callId = `c${s.callCounter++}`;
+      const key = `${execId}:${callId}`;
+      const promise = new Promise<string>((resolveCall) => {
+        pendingHostCalls.set(key, resolveCall);
+      });
+      send({
+        type: "host-call",
+        execId,
+        callId,
+        path,
+        argsJson,
+      });
+      return promise;
+    },
+  );
+  await jail.set("__host_invoke", invokeRef);
+
+  // Bootstrap: install proxy + console capture + sandbox helpers. Runs once.
+  const bootstrap = await isolate.compileScript(proxyScript);
+  await bootstrap.run(context);
+
+  session = { isolate, context, callCounter: 0 };
+  refreshIdleTimer();
+  return { wasReset: true };
+}
+
+function refreshIdleTimer(): void {
+  if (idleTimer) clearTimeout(idleTimer);
+  idleTimer = setTimeout(() => {
+    logErr("idle TTL hit; disposing isolate");
+    disposeSession();
+  }, IDLE_TTL_MS);
+  idleTimer.unref?.();
+}
+
+function disposeSession(): void {
+  if (idleTimer) {
+    clearTimeout(idleTimer);
+    idleTimer = null;
+  }
+  if (session) {
+    try {
+      session.isolate.dispose();
+    } catch {
+      // already disposed
+    }
+    session = null;
+  }
+}
+
 async function handleExecute(msg: ExecuteRequestMessage): Promise<void> {
   const start = Date.now();
-  if (!proxyScript) {
+
+  let wasReset = false;
+  try {
+    ({ wasReset } = await ensureSession());
+  } catch (e) {
     send({
       type: "execute-result",
       id: msg.id,
       ok: false,
-      error: "Sidecar not initialized (missing init message)",
+      error: e instanceof Error ? e.message : String(e),
       stdout: [],
       durationMs: Date.now() - start,
     });
     return;
   }
 
-  // A fresh isolate per execute keeps the threat model crisp — user code
-  // can't carry state across calls, and we can hard-kill on timeout.
-  const isolate = new ivm.Isolate({ memoryLimit: 128 });
+  const s = session;
+  if (!s) {
+    send({
+      type: "execute-result",
+      id: msg.id,
+      ok: false,
+      error: "session disposed before execute could run",
+      stdout: [],
+      durationMs: Date.now() - start,
+    });
+    return;
+  }
+
+  currentExecId = msg.id;
   try {
-    const context = await isolate.createContext();
-    const jail = context.global;
-    await jail.set("global", jail.derefInto());
-
-    // Host bridge: every sandbox SDK call returns here. The function takes
-    // (path: string, argsJson: string) and resolves with a result JSON string.
-    let callCounter = 0;
-    const invokeRef = new ivm.Reference(
-      async (path: string, argsJson: string) => {
-        const callId = `c${callCounter++}`;
-        const key = `${msg.id}:${callId}`;
-        const promise = new Promise<string>((resolveCall) => {
-          pendingHostCalls.set(key, resolveCall);
-        });
-        send({
-          type: "host-call",
-          execId: msg.id,
-          callId,
-          path,
-          argsJson,
-        });
-        return promise;
-      },
-    );
-    await jail.set("__host_invoke", invokeRef);
-
-    // Bootstrap: install proxy + console capture.
-    const bootstrap = await isolate.compileScript(proxyScript);
-    await bootstrap.run(context);
-
-    // Strip TS so the LLM can write idiomatic-looking TS. (We delegate to the
-    // main process to do this BEFORE sending — see sidecar-runner.ts.)
+    // Reset stdout for this call; user-declared globals on `globalThis`
+    // persist across calls (the whole point of stateful sessions).
+    // Strip TS in the main process before sending — we don't ship sucrase
+    // to the sidecar (see sidecar-runner.ts).
     const wrapped = `
 (async () => {
+  __resetStdout();
   const __result = await (async () => {
 ${msg.code}
   })();
@@ -173,8 +260,8 @@ ${msg.code}
 })();
 `;
 
-    const userScript = await isolate.compileScript(wrapped);
-    const resultJson = (await userScript.run(context, {
+    const userScript = await s.isolate.compileScript(wrapped);
+    const resultJson = (await userScript.run(s.context, {
       timeout: msg.timeoutMs,
       promise: true,
     })) as string;
@@ -190,10 +277,18 @@ ${msg.code}
       resultJson: JSON.stringify(parsed.result ?? null),
       stdout: parsed.stdout,
       durationMs: Date.now() - start,
+      ...(wasReset ? { sessionReset: true } : {}),
     });
   } catch (e) {
     const msgStr = e instanceof Error ? e.message : String(e);
     const isTimeout = msgStr.includes("Script execution timed out");
+    const isOOM =
+      msgStr.includes("memory") || msgStr.includes("Array buffer allocation");
+    // Memory limit kills the isolate. Drop the session so the next call
+    // builds a fresh one (the LLM will see sessionReset on it).
+    if (isOOM) {
+      disposeSession();
+    }
     send({
       type: "execute-result",
       id: msg.id,
@@ -203,14 +298,16 @@ ${msg.code}
         : msgStr,
       stdout: [],
       durationMs: Date.now() - start,
+      ...(wasReset ? { sessionReset: true } : {}),
     });
   } finally {
-    // Cleanup pending host calls for this execute (sandboxed code that's
-    // still awaiting a host response when we time out / error).
+    currentExecId = null;
+    // Don't dispose the isolate — that's the whole point of stateful sessions.
+    // Clean up any orphaned pending host calls for this execute.
     for (const key of pendingHostCalls.keys()) {
       if (key.startsWith(`${msg.id}:`)) pendingHostCalls.delete(key);
     }
-    isolate.dispose();
+    refreshIdleTimer();
   }
 }
 
@@ -277,11 +374,14 @@ function buildIsolateProxyScript(paths: string[]): string {
     },
   };
   globalThis.__getStdout = () => __stdout;
+  globalThis.__resetStdout = () => { __stdout.length = 0; };
 
   const __sdk = ${emit(tree)};
   for (const k of Object.keys(__sdk)) {
     globalThis[k] = __sdk[k];
   }
 })();
+
+${SANDBOX_HELPERS_SOURCE}
 `;
 }

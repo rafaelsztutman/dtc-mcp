@@ -1,12 +1,20 @@
-# dtc-mcp v1.0
+# dtc-mcp v1.5
 
-**Stainless-style two-tool MCP for DTC e-commerce.** The LLM writes TypeScript against typed Klaviyo + Shopify SDKs in an isolated V8 sandbox — instead of picking from a long menu of pre-built tools.
+**Code-execution MCP for DTC e-commerce. Three architectural moves beyond Stainless.**
 
-> v1.0 is a complete rewrite of [v0.2](https://github.com/rafaelsztutman/dtc-mcp/tree/v0.2). The 22 hand-built analytics tools are gone; in their place are two tools that compose to anything those 22 could do — and arbitrary new analyses besides. See **Migration from v0.2** below.
+The LLM writes TypeScript against typed Klaviyo + Shopify SDKs in a sandbox — instead of picking from a long menu of pre-built tools. v1.5 takes the Stainless / Cloudflare / Anthropic "code execution + docs search" pattern and adds three things none of them ship:
 
-Inspired by [Stainless's code-execution MCP architecture](https://www.stainless.com/docs/mcp/) and [Cloudflare's Code Mode](https://blog.cloudflare.com/code-mode-mcp/), which both report ~99% input-token reduction vs traditional one-tool-per-endpoint MCPs.
+1. **Stateful sandbox sessions.** Variables on `globalThis` persist across `execute_code` calls within the same MCP connection. Stainless's Cloudflare-Workers sandbox is stateless per call; ours isn't. Iterative DTC analyses don't re-fetch.
+2. **Code-as-docs via `read_doc`.** Adopts Anthropic's [filesystem-as-API pattern](https://www.anthropic.com/engineering/code-execution-with-mcp) — direct chunk fetch by exact path, cheaper than re-searching when the LLM already knows what it wants.
+3. **Output projection contracts.** In-sandbox `pick` / `topN` / `summarize` helpers + a host-side 100 KB response cap. Directly attacks the published 53% factuality ceiling of code-mode MCP (models over-return; we give them the vocabulary to be disciplined AND enforce a ceiling).
 
-## The two tools
+Plus everything v1.0 already had: hybrid sidecar runner that works inside Claude Desktop's Electron hardened-runtime, `node:vm` fallback when no system Node is available, self-hosted auto-updating docs via jsDelivr CDN.
+
+> v1.5 is a complete rewrite of [v0.2](https://github.com/rafaelsztutman/dtc-mcp/tree/v0.2). The 22 hand-built analytics tools are gone; in their place are three composable primitives. See **Migration from v0.2** below.
+
+Inspired by [Stainless's SDK Code Mode](https://www.stainless.com/blog/sdk-code-mode), [Cloudflare's Code Mode](https://blog.cloudflare.com/code-mode-mcp/), and Anthropic's [Code Execution with MCP](https://www.anthropic.com/engineering/code-execution-with-mcp) — extended where the literature shows soft spots.
+
+## The three tools
 
 ### `execute_code`
 Runs JavaScript (TypeScript syntax supported, stripped via [sucrase](https://github.com/alangpierce/sucrase)) inside a **hybrid sandbox**:
@@ -18,6 +26,8 @@ Globals exposed in both modes:
 - `klaviyo` — typed client wrapping the Klaviyo REST API (`get`, `post`, `paginate`, plus `campaigns`, `flows`, `lists`, `segments`, `profiles`, `events`, `metrics`, `reporting.{campaignValues,flowValues}`)
 - `shopify` — typed client for Shopify Admin GraphQL + ShopifyQL (`gql`, `ql`, `timezone`)
 - `console.{log,error,warn,info}` — captured and returned to the caller as `stdout`
+- `pick(value, schema)` / `topN(arr, n, by)` / `summarize(arr, opts)` — output-discipline helpers. Use these to project / aggregate raw API responses before returning. See `guide.output-discipline`.
+- `globalThis.*` — assignments persist across calls within the same MCP connection. See `guide.stateful-sessions`.
 
 The host applies rate limiting, auth, and caching transparently — Klaviyo's dual-tier limiter (1/s reporting, 10/s standard), Shopify's GraphQL cost budget, and a 10-min reporting POST cache all carry over from v0.2's battle-tested implementations.
 
@@ -47,6 +57,15 @@ return top;
 Searches the bundled SDK reference (MiniSearch / BM25) for method signatures, parameter docs, and runnable recipes. Use this **before** writing code in `execute_code` — it tells the LLM exactly which methods are exposed and how to call them.
 
 Docs are auto-refreshed daily from [dtc-mcp-docs](https://github.com/rafaelsztutman/dtc-mcp-docs) via jsDelivr CDN (with ETag negotiation). New Klaviyo / Shopify API revisions land without a new MCP release.
+
+### `read_doc`
+Fetches a specific docs chunk by exact path, or lists all available paths when called with no args. Use after `search_docs` to fetch one chunk's full content without paying the search round-trip — or call `read_doc({})` at session start to map out the entire SDK surface in one go.
+
+```js
+read_doc({ path: "klaviyo.reporting.campaignValues" })  // single chunk
+read_doc({ platform: "shopify" })                       // list Shopify paths
+read_doc({})                                            // list all 332 paths
+```
 
 ## Sandbox architecture
 
@@ -151,6 +170,7 @@ Klaviyo-only mode: omit the `SHOPIFY_*` variables. `shopify.*` calls in the sand
 | `DTC_MCP_DOCS_REFRESH` | No | Set to `0` to disable the background docs refresh (offline mode) |
 | `DTC_MCP_SANDBOX` | No | `auto` (default) \| `sidecar` (require isolated-vm) \| `vm` (force `node:vm`) |
 | `DTC_MCP_NODE_PATH` | No | Absolute path to the Node binary used by the sidecar. Skips discovery. |
+| `DTC_MCP_MAX_RESPONSE_KB` | No | Cap on bytes of `execute_code` return values (default `100`). |
 | `LOG_LEVEL` | No | `debug` \| `info` \| `warn` \| `error` (default `info`) |
 
 ## Migration from v0.2

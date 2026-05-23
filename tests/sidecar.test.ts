@@ -56,6 +56,25 @@ describe("sidecar runner (isolated-vm via spawned Node)", async () => {
     expect(result.stdout).toEqual(["from isolate"]);
   });
 
+  runIt("globalThis assignments persist across calls in the isolate", async () => {
+    const { runSandbox } = await import("../src/sandbox/runner.js");
+    // Two consecutive calls — the second can read state set by the first.
+    // Note: other tests in this file may have already initialized the
+    // sidecar's isolate, so we don't assert on r1.sessionReset here.
+    const r1 = await runSandbox(`globalThis.shared = 'kept'; return 1;`, {
+      timeoutMs: 10_000,
+    });
+    expect(r1.ok).toBe(true);
+    expect(r1.sandbox).toBe("sidecar");
+
+    const r2 = await runSandbox(`return globalThis.shared;`, {
+      timeoutMs: 10_000,
+    });
+    expect(r2.ok).toBe(true);
+    expect(r2.result).toBe("kept");
+    expect(r2.sessionReset).toBeUndefined();
+  });
+
   runIt(
     "wires klaviyo proxy and host-bridge round-trip succeeds (path validation only)",
     async () => {

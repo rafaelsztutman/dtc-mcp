@@ -20,8 +20,9 @@ src/
   server.ts             # creates the McpServer + registers the 2 tools
   config.ts             # lazy per-field env validation (KEEP this pattern)
   tools/
-    execute_code.ts     # MCP tool: runs user code in the sandbox
-    search_docs.ts      # MCP tool: searches the docs index
+    execute_code.ts     # MCP tool: runs user code in the sandbox (stateful per MCP conn)
+    search_docs.ts      # MCP tool: searches the docs index (BM25)
+    read_doc.ts         # MCP tool: direct fetch by chunk ID, or list all paths
   sandbox/
     runner.ts           # public entry — routes between sidecar and vm
     vm-runner.ts        # node:vm in-process fallback
@@ -48,7 +49,9 @@ tools/codegen/          # build-time spec → SDK types + docs.json
 
 ## Key invariants
 
-1. **Sandbox has no escape hatches.** No `fetch`, `process`, `require`, `import`, `setTimeout`. Only `klaviyo`, `shopify`, `console`, plus standard JS globals (`Date`, `JSON`, `Math`, `Promise`, etc.).
+1. **Sandbox has no escape hatches.** No `fetch`, `process`, `require`, `import`, `setTimeout`. Only `klaviyo`, `shopify`, `console`, `pick`, `topN`, `summarize`, plus standard JS globals (`Date`, `JSON`, `Math`, `Promise`, etc.).
+1a. **Sandbox is stateful per MCP connection.** Both runners keep one context alive across `execute_code` calls until the connection closes (or 30 min idle TTL fires or 256 MB heap cap blows). LLM code shares data across calls via `globalThis.*`. When a reset happens, the next result includes `sessionReset: true`.
+1b. **Response payload cap.** The runner caps `execute_code` return values at `DTC_MCP_MAX_RESPONSE_KB` (default 100). Oversized returns are replaced with `{truncated: true, preview, instructions: ...}`. LLM should use `pick`/`topN`/`summarize` to stay under the cap.
 2. **All API access goes through the host bridge** (`src/sandbox/bridge.ts`). To add a new SDK method, register it in the `handlers` map there. Both runners mirror the registry as a namespace tree.
 3. **Rate limiting and caching live on the host side** — never in the sandbox. Fresh isolate per invocation (sidecar) means no cross-call state. The main MCP server carries it.
 4. **isolated-vm cannot load directly in Claude Desktop** because of macOS Library Validation. It MUST be loaded by a spawned system Node process — the sidecar. Don't move the `isolated-vm` import into the main process.

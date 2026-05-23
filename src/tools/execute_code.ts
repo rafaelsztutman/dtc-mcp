@@ -63,6 +63,13 @@ export function registerExecuteCode(server: McpServer): void {
           stdout: result.stdout,
           durationMs: result.durationMs,
           sandbox: result.sandbox,
+          ...(result.sessionReset
+            ? {
+                sessionReset: true,
+                sessionResetNote:
+                  "The sandbox context was recreated (idle TTL, OOM, or first call). Any variables you set on globalThis in earlier calls are gone — re-declare what you need.",
+              }
+            : {}),
         },
         null,
         2,

@@ -8,6 +8,14 @@ import { log } from "../config.js";
  * Run user-supplied JavaScript (TypeScript syntax accepted, stripped via sucrase)
  * inside a constrained `node:vm` context.
  *
+ * State model: **stateful, per MCP connection**. We keep a single long-lived
+ * `vm.Context` at module scope for the lifetime of the MCP server process,
+ * which equals one Claude Desktop "connect to extension" session. User code
+ * that assigns to `globalThis.foo = ...` (or declares `var foo = ...`) will
+ * still be visible in the next `execute_code` call. After 30 minutes of
+ * idleness the context is destroyed and recreated; the next call's result
+ * envelope includes `sessionReset: true` so the LLM knows prior state is gone.
+ *
  * Threat model: this sandbox is a **mistake fence**, not a security boundary.
  *   - User installs this MCP locally, supplies their own Klaviyo/Shopify creds
  *   - The "untrusted" code originates from the user's own LLM client (Claude),
@@ -15,14 +23,7 @@ import { log } from "../config.js";
  *   - Goal: prevent accidental access to `fetch`/`process`/`fs`/`env` so a
  *     buggy LLM call doesn't exfiltrate creds or hammer the network
  *   - Non-goal: stop a determined attacker — `node:vm` is well-known to be
- *     escapable via prototype-chain walks; if hostile code is a concern,
- *     run the server as an isolated child process or behind a real sandbox.
- *
- * Why not `isolated-vm`: it works perfectly stand-alone, but Claude Desktop is
- * Electron and Electron's hardened runtime refuses to dlopen native modules
- * whose Team ID doesn't match the host's. We can't sign with Anthropic's cert,
- * and ad-hoc signatures (no Team ID) are also rejected. `node:vm` is built-in,
- * no native dep, no code-signing concerns.
+ *     escapable via prototype-chain walks
  */
 
 export interface RunResult {
@@ -31,21 +32,22 @@ export interface RunResult {
   stdout: string[];
   error?: string;
   durationMs: number;
+  /** True when the underlying context was recreated since the last call. */
+  sessionReset?: boolean;
 }
 
-export async function runSandboxVm(
-  code: string,
-  options: { timeoutMs: number },
-): Promise<RunResult> {
-  const start = Date.now();
+const IDLE_TTL_MS = 30 * 60_000; // 30 minutes
 
-  // The context object IS the sandbox's globalThis. Anything not on it is
-  // genuinely unreachable from sandbox code (modulo prototype-chain tricks).
-  // We deliberately omit `process`, `Buffer`, `require`, `module`, `fetch`,
-  // `setTimeout`, `setInterval`, `setImmediate`, `queueMicrotask`,
-  // `WebAssembly`, `clearTimeout`, and anything else that could be misused.
+interface VmSession {
+  context: vm.Context;
+  idleTimer: NodeJS.Timeout | null;
+  callCount: number;
+}
+
+let session: VmSession | null = null;
+
+function newContext(): vm.Context {
   const context: Record<string, unknown> = {
-    // Host bridge — the one and only way out of the sandbox.
     __host_invoke: async (path: string, argsJson: string): Promise<string> => {
       try {
         const args = JSON.parse(argsJson) as unknown[];
@@ -56,7 +58,6 @@ export async function runSandboxVm(
         return `__ERROR__${msg}`;
       }
     },
-    // Standard JS globals that don't reach into Node internals.
     Promise,
     JSON,
     Math,
@@ -97,41 +98,63 @@ export async function runSandboxVm(
         : undefined,
   };
 
-  // Define globalThis as a self-reference so the proxy template can attach
-  // namespaces (`globalThis.klaviyo = ...`) without us pre-declaring each one.
   vm.createContext(context);
   (context as { globalThis: unknown }).globalThis = context;
 
-  // Bootstrap: install console capture + the `klaviyo`/`shopify` namespace tree.
-  try {
-    vm.runInContext(buildProxyScript(methodPaths), context as vm.Context);
-  } catch (e) {
-    return {
-      ok: false,
-      error: `Failed to bootstrap sandbox: ${e instanceof Error ? e.message : String(e)}`,
-      stdout: [],
-      durationMs: Date.now() - start,
-    };
-  }
+  // Bootstrap once at session creation: install console capture, the
+  // klaviyo/shopify namespace tree, and the output-discipline helpers.
+  vm.runInContext(buildProxyScript(methodPaths), context as vm.Context);
 
-  // Sucrase strips TS-only syntax (annotations, interfaces, casts, generics).
-  let jsCode: string;
-  try {
-    jsCode = transform(code, {
-      transforms: ["typescript"],
-      disableESTransforms: true,
-      production: true,
-    }).code;
-  } catch {
-    // Fall through with the original source so V8 gives the user a real
-    // parser error rather than a vague transform failure.
-    jsCode = code;
-  }
+  return context as vm.Context;
+}
 
-  // Wrap in an async IIFE; the IIFE's return becomes the sandbox result.
+function refreshIdleTimer(s: VmSession): void {
+  if (s.idleTimer) clearTimeout(s.idleTimer);
+  s.idleTimer = setTimeout(() => {
+    log("info", "vm-runner: session idle, destroying context");
+    session = null;
+  }, IDLE_TTL_MS);
+  // Don't keep the event loop alive just for the idle timer.
+  s.idleTimer.unref?.();
+}
+
+function ensureSession(): { session: VmSession; wasReset: boolean } {
+  if (session) {
+    refreshIdleTimer(session);
+    return { session, wasReset: false };
+  }
+  log("debug", "vm-runner: creating new session context");
+  session = { context: newContext(), idleTimer: null, callCount: 0 };
+  refreshIdleTimer(session);
+  return { session, wasReset: true };
+}
+
+/** Test/dev hook: drop the live context so the next call gets a fresh one. */
+export function resetVmSessionForTests(): void {
+  if (session?.idleTimer) clearTimeout(session.idleTimer);
+  session = null;
+}
+
+export async function runSandboxVm(
+  code: string,
+  options: { timeoutMs: number },
+): Promise<RunResult> {
+  const start = Date.now();
+  const { session: s, wasReset } = ensureSession();
+  s.callCount++;
+
+  // After the first call, the proxy bootstrap script's IIFE has already run
+  // and console / klaviyo / etc. are installed. We only need to wrap user
+  // code in an async IIFE per call. Stdout is captured per-call via the
+  // closure inside the bootstrap (re-installed below as a fresh array so
+  // calls don't share stdout).
+  // The bootstrap installs __getStdout but the inner __stdout array survives
+  // across calls — we explicitly reset it for each call.
   const wrapped = `(async () => {
+  // Reset stdout for this call (state-sharing isn't useful for log lines).
+  globalThis.__resetStdout?.();
   const __result = await (async () => {
-${jsCode}
+${transformIfTs(code)}
   })();
   return JSON.stringify({
     result: __result === undefined ? null : __result,
@@ -139,19 +162,22 @@ ${jsCode}
   });
 })();`;
 
-  // node:vm's `timeout` only catches synchronous code; async code doesn't honor
-  // it. We race the IIFE promise against a manual timer instead. NOTE: a
-  // runaway sync loop (`while(true)`) IS caught by the `timeout` option below;
-  // a runaway async loop (`while(true) await something`) is caught by the race.
-  // In either case the rejected promise tells the LLM to add `// @timeout`.
+  // First-call hook: install __resetStdout. We do this lazily so the
+  // bootstrap script doesn't need to know about session semantics.
+  if (s.callCount === 1) {
+    vm.runInContext(
+      `globalThis.__resetStdout = () => { while (__getStdout().length) __getStdout().pop(); };`,
+      s.context,
+    );
+  }
+
   let userPromise: Promise<unknown>;
   try {
-    userPromise = vm.runInContext(wrapped, context as vm.Context, {
+    userPromise = vm.runInContext(wrapped, s.context, {
       timeout: options.timeoutMs,
     }) as Promise<unknown>;
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
-    log("debug", "Sandbox sync error", { error: msg });
     const isTimeout = msg.includes("Script execution timed out");
     return {
       ok: false,
@@ -160,6 +186,7 @@ ${jsCode}
         : msg,
       stdout: [],
       durationMs: Date.now() - start,
+      ...(wasReset ? { sessionReset: true } : {}),
     };
   }
 
@@ -185,6 +212,7 @@ ${jsCode}
       result: parsed.result,
       stdout: parsed.stdout,
       durationMs: Date.now() - start,
+      ...(wasReset ? { sessionReset: true } : {}),
     };
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
@@ -193,8 +221,21 @@ ${jsCode}
       error: msg,
       stdout: [],
       durationMs: Date.now() - start,
+      ...(wasReset ? { sessionReset: true } : {}),
     };
   } finally {
     if (timer) clearTimeout(timer);
+  }
+}
+
+function transformIfTs(src: string): string {
+  try {
+    return transform(src, {
+      transforms: ["typescript"],
+      disableESTransforms: true,
+      production: true,
+    }).code;
+  } catch {
+    return src;
   }
 }

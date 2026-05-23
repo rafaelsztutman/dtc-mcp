@@ -73,6 +73,8 @@ export interface ExecuteResponseMessage {
   stdout: string[];
   error?: string;
   durationMs: number;
+  /** True when the underlying isolate was recreated since the last call. */
+  sessionReset?: boolean;
 }
 
 export interface ShutdownMessage {

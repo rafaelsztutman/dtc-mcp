@@ -195,6 +195,7 @@ class SidecarProcess {
         result,
         stdout: msg.stdout,
         durationMs: msg.durationMs,
+        ...(msg.sessionReset ? { sessionReset: true } : {}),
       });
     } else {
       p.resolve({
@@ -202,6 +203,7 @@ class SidecarProcess {
         error: msg.error ?? "unknown error",
         stdout: msg.stdout ?? [],
         durationMs: msg.durationMs,
+        ...(msg.sessionReset ? { sessionReset: true } : {}),
       });
     }
   }
