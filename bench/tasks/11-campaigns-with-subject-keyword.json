@@ -1,0 +1,10 @@
+{
+  "id": "11-campaigns-with-subject-keyword",
+  "category": "multi-step",
+  "prompt": "Find up to 5 sent campaigns whose subject line (case-insensitive) contains the word 'sale'. Put the answer inside `final_answer` as a JSON array of objects, each with fields: id, name, subject_line. If fewer than 5 exist, return however many were found (but at least 1).",
+  "claims": [
+    { "type": "fields-present", "expected": ["id", "name", "subject_line"], "description": "each item has id, name, subject_line" },
+    { "type": "judge", "expected": "Every campaign listed has the word 'sale' (case-insensitive) somewhere in its subject_line field. The list should not be empty.", "description": "all subjects actually contain 'sale'" }
+  ],
+  "notes": "Tests filtering inside a list response. dtc-mcp can do this in one execute_code call; klaviyo-mcp likely needs to fetch all + filter client-side."
+}

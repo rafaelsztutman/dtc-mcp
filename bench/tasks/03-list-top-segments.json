@@ -1,0 +1,11 @@
+{
+  "id": "03-list-top-segments",
+  "category": "single-fact",
+  "prompt": "List the 5 largest segments by member count in this Klaviyo account. Put the answer inside `final_answer` as a JSON array of exactly 5 objects, each with fields: id, name, profile_count. Order by profile_count descending.",
+  "claims": [
+    { "type": "list-size", "expected": 5, "description": "exactly 5 segments returned" },
+    { "type": "fields-present", "expected": ["id", "name", "profile_count"], "description": "each item has id, name, profile_count" },
+    { "type": "ordering", "expected": "descending", "description": "ordered by profile_count descending" }
+  ],
+  "notes": "Segment profile_count may live under attributes; sub-agent must flatten."
+}

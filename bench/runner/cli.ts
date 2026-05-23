@@ -43,7 +43,7 @@ import {
 } from "./state.js";
 import { estimateCellTokens, fillToolCallBytes } from "./estimator.js";
 import { constraintViolations, gradeCell } from "./grader.js";
-import { buildSubAgentPrompt, MCP_PREFIX } from "./prompt-templates.js";
+import { buildSubAgentPrompt, prefixFor } from "./prompt-templates.js";
 import { writeReport } from "./report.js";
 import type {
   Batch,
@@ -101,6 +101,7 @@ async function cmdInit(): Promise<void> {
     toolCount: 0,
     toolListBytes: 0,
     toolPrefixes: [],
+    prefix: "",
     notes: "Run `cli.ts probe` to populate.",
   };
 
@@ -163,7 +164,7 @@ async function cmdPlan(args: { batch: Batch; limit?: number }): Promise<void> {
       mcp: cell.mcp,
       taskId: cell.taskId,
       trial: cell.trial,
-      prefix: MCP_PREFIX[cell.mcp],
+      prefix: prefixFor(cell.mcp, metadata),
       delayBeforeMs: delay,
       reportingHeavy: !!task.reportingHeavy,
       description: subAgent.description,
@@ -215,14 +216,16 @@ async function cmdRecord(args: {
     fillToolCallBytes,
   );
 
+  const metadata = state.mcpMetadata[cell.mcp];
+  const prefix = prefixFor(cell.mcp, metadata);
+
   // Constraint check before grading — invalid trials don't get scored.
   const violations = constraintViolations(
     { ...cell, trajectory: submission.trajectory },
-    MCP_PREFIX[cell.mcp],
+    prefix,
   );
   const isInvalid = violations.length > 0;
 
-  const metadata = state.mcpMetadata[cell.mcp];
   const tokens = estimateCellTokens(
     { ...cell, trajectory: submission.trajectory },
     metadata,
@@ -235,7 +238,7 @@ async function cmdRecord(args: {
     estimatedTokens: tokens.total,
     status: isInvalid ? "invalid" : "recorded",
     error: isInvalid
-      ? `Constraint violation: called tools outside ${MCP_PREFIX[cell.mcp]} — ${violations.join(", ")}`
+      ? `Constraint violation: called tools outside ${prefix} — ${violations.join(", ")}`
       : undefined,
     startedAt: submission.startedAt,
     finishedAt: submission.finishedAt,
@@ -300,15 +303,40 @@ async function cmdProbe(args: { input: string }): Promise<void> {
     if (!entry) continue;
     const names = entry.toolList.map((t) => t.name);
     const bytes = Buffer.byteLength(JSON.stringify(entry.toolList), "utf8");
+    const prefix = inferCommonPrefix(names);
+    if (!prefix) {
+      console.error(
+        `${mcp}: could not infer a common prefix from ${names.length} tools — got ${JSON.stringify(names.slice(0, 3))}`,
+      );
+      process.exit(1);
+    }
     state.mcpMetadata[mcp] = {
       toolCount: names.length,
       toolListBytes: bytes,
       toolPrefixes: names,
+      prefix,
       notes: entry.notes,
     };
-    console.log(`${mcp}: ${names.length} tools, ${bytes} bytes`);
+    console.log(`${mcp}: ${names.length} tools, ${bytes} bytes, prefix=${prefix}`);
   }
   await writeState(runDir, state);
+}
+
+/**
+ * Compute the longest common `mcp__<server>__` prefix shared by all tool
+ * names. Returns "" if the inputs don't all share an `mcp__*__` prefix, so
+ * the caller can fail loudly instead of silently using a useless empty
+ * string as a constraint.
+ */
+function inferCommonPrefix(toolNames: string[]): string {
+  if (toolNames.length === 0) return "";
+  const first = toolNames[0];
+  if (!first.startsWith("mcp__")) return "";
+  const afterMcp = first.slice("mcp__".length);
+  const sep = afterMcp.indexOf("__");
+  if (sep === -1) return "";
+  const candidate = "mcp__" + afterMcp.slice(0, sep) + "__";
+  return toolNames.every((n) => n.startsWith(candidate)) ? candidate : "";
 }
 
 async function cmdCalibrate(): Promise<void> {

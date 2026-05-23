@@ -1,0 +1,10 @@
+{
+  "id": "15-strict-format-discipline",
+  "category": "output-discipline",
+  "prompt": "List the names of the 3 most recently sent campaigns. Format requirement: `final_answer` must be EXACTLY a JSON array of 3 strings — just the campaign names, nothing else. No objects, no extra fields, no markdown, no explanation, no surrounding prose. The first character of `final_answer` must be `[` and the last character must be `]`.",
+  "claims": [
+    { "type": "list-size", "expected": 3, "description": "exactly 3 names" },
+    { "type": "judge", "expected": "The final_answer is a clean JSON array of exactly 3 string values (campaign names), with no objects, no extra fields, no markdown fencing, and no surrounding prose.", "description": "strict format compliance" }
+  ],
+  "notes": "Tests whether the MCP's response shape encourages the sub-agent to over-respond. dtc-mcp's pick/topN/summarize helpers should give an edge here."
+}

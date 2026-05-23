@@ -1,0 +1,10 @@
+{
+  "id": "02-list-active-flows",
+  "category": "single-fact",
+  "prompt": "List 3 flows from this Klaviyo account. Put the answer inside `final_answer` as a JSON array of exactly 3 objects, each with fields: id, name, status.",
+  "claims": [
+    { "type": "list-size", "expected": 3, "description": "exactly 3 flows returned" },
+    { "type": "fields-present", "expected": ["id", "name", "status"], "description": "each item has id, name, status" }
+  ],
+  "notes": "Tests basic flow listing. Both MCPs expose this directly."
+}

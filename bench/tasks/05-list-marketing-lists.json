@@ -1,0 +1,10 @@
+{
+  "id": "05-list-marketing-lists",
+  "category": "single-fact",
+  "prompt": "List 5 marketing lists from this Klaviyo account. Put the answer inside `final_answer` as a JSON array of exactly 5 objects, each with fields: id, name, created.",
+  "claims": [
+    { "type": "list-size", "expected": 5, "description": "exactly 5 lists returned" },
+    { "type": "fields-present", "expected": ["id", "name", "created"], "description": "each item has id, name, created" }
+  ],
+  "notes": "Both MCPs expose get_lists directly."
+}

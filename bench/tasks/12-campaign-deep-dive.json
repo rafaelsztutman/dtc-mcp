@@ -1,0 +1,17 @@
+{
+  "id": "12-campaign-deep-dive",
+  "category": "cross-resource",
+  "prompt": "(multi-turn, see turns)",
+  "turns": [
+    { "prompt": "Find the most recently sent campaign in this Klaviyo account. Report its id and name." },
+    { "prompt": "Now pull the open rate and click rate for that campaign over the period since it was sent." },
+    { "prompt": "Summarize in `final_answer` as a JSON array containing a single object with fields: name, send_time, open_rate, click_rate." }
+  ],
+  "claims": [
+    { "type": "list-size", "expected": 1, "description": "single-item array" },
+    { "type": "fields-present", "expected": ["name", "send_time", "open_rate", "click_rate"], "description": "all four fields present" },
+    { "type": "judge", "expected": "The open_rate and click_rate values are plausible decimals between 0 and 1 (or percentages between 0 and 100) for a real campaign.", "description": "rates look plausible" }
+  ],
+  "reportingHeavy": true,
+  "notes": "Multi-turn. Tests state retention across turns + reporting endpoint."
+}

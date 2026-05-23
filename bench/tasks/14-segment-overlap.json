@@ -1,0 +1,18 @@
+{
+  "id": "14-segment-overlap",
+  "category": "cross-resource",
+  "prompt": "(multi-turn, see turns)",
+  "turns": [
+    { "prompt": "List 2 large segments from this Klaviyo account. Report their ids, names, and approximate member counts." },
+    { "prompt": "Confirm the exact current member count for each of those 2 segments." },
+    { "prompt": "Return `final_answer` as a JSON array of exactly 2 objects, each with fields: name, count, rank. The `rank` field must be the string \"larger\" for the segment with the higher count, and \"smaller\" for the other." }
+  ],
+  "claims": [
+    { "type": "list-size", "expected": 2, "description": "exactly 2 segments compared" },
+    { "type": "fields-present", "expected": ["name", "count", "rank"], "description": "each item has name, count, rank" },
+    { "type": "contains-string", "expected": "larger", "description": "answer marks one segment as larger" },
+    { "type": "contains-string", "expected": "smaller", "description": "answer marks the other as smaller" },
+    { "type": "judge", "expected": "The segment marked 'larger' has a strictly greater count value than the one marked 'smaller'.", "description": "rank assignment matches actual counts" }
+  ],
+  "notes": "Multi-turn. Tests ordering judgment, not rates."
+}

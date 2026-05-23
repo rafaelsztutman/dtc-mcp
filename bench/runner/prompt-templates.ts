@@ -7,17 +7,22 @@ import type { Mcp, McpMetadata, Task } from "./types.js";
  * `constraintViolations()` and the trial is invalidated.
  *
  * Claude Code exposes MCP tools with names like `mcp__<server>__<tool>`,
- * where `<server>` matches the key in the MCP config. So a dtc-mcp tool
- * is `mcp__dtc-mcp__execute_code`, and a klaviyo tool is e.g.
- * `mcp__klaviyo__get_campaigns`. The prefixes below are stable per MCP
- * config; the runner verifies them at init time when it dumps `tools/list`
- * for both servers.
+ * where `<server>` matches the key in the MCP config. The actual prefix
+ * depends on how the user named their MCP entry — `mcp__dtc-mcp__*`,
+ * `mcp__klaviyo__*`, `mcp__claude_ai_Klaviyo__*`, etc. The values below
+ * are static defaults; `cli.ts probe` infers the real prefix from the
+ * tools/list dump and stores it in `state.mcpMetadata[mcp].prefix`. The
+ * prompt builder prefers the probed prefix when set.
  */
 
 export const MCP_PREFIX: Record<Mcp, string> = {
   "dtc-mcp": "mcp__dtc-mcp__",
   "klaviyo-mcp": "mcp__klaviyo__",
 };
+
+export function prefixFor(mcp: Mcp, metadata: McpMetadata): string {
+  return metadata.prefix || MCP_PREFIX[mcp];
+}
 
 export interface SubAgentPrompt {
   /** Becomes the sub-agent's `prompt` argument to the Agent tool. */
@@ -32,7 +37,7 @@ export function buildSubAgentPrompt(
   trial: number,
   metadata: McpMetadata,
 ): SubAgentPrompt {
-  const prefix = MCP_PREFIX[mcp];
+  const prefix = prefixFor(mcp, metadata);
   const allowedTools = metadata.toolPrefixes
     .filter((name) => name.startsWith(prefix))
     .map((name) => `  • ${name}`)

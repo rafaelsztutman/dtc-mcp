@@ -1,5 +1,6 @@
 import { readFile, writeFile, mkdir } from "node:fs/promises";
 import { existsSync } from "node:fs";
+import * as nodeFsSync from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import type {
   Batch,
@@ -205,7 +206,7 @@ export function findOrCreateRunDir(
 
   if (preferExisting && existsSync(resultsDir)) {
     // Most recent timestamped subdir wins.
-    const { readdirSync, statSync } = require("node:fs") as typeof import("node:fs");
+    const { readdirSync, statSync } = nodeFsSync;
     const subs = readdirSync(resultsDir)
       .map((name) => ({ name, full: join(resultsDir, name) }))
       .filter((entry) => statSync(entry.full).isDirectory())

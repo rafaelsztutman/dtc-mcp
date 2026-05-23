@@ -1,0 +1,11 @@
+{
+  "id": "04-find-placed-order-metric",
+  "category": "single-fact",
+  "prompt": "Find the 'Placed Order' metric in this Klaviyo account and return its details. Put the answer inside `final_answer` as a JSON array containing a single object with fields: id, name, integration. The `name` field must be the exact metric name 'Placed Order'.",
+  "claims": [
+    { "type": "contains-string", "expected": "Placed Order", "description": "answer mentions the Placed Order metric name" },
+    { "type": "list-size", "expected": 1, "description": "single-item array returned" },
+    { "type": "fields-present", "expected": ["id", "name", "integration"], "description": "object has id, name, integration" }
+  ],
+  "notes": "Tests targeted metric lookup. Both MCPs expose get_metrics; sub-agent must filter or scan."
+}

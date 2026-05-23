@@ -186,6 +186,10 @@ export interface PacingConfig {
 export interface McpMetadata {
   toolCount: number;
   toolListBytes: number;
+  /** Full tool names dumped by `cli.ts probe` (e.g. `mcp__dtc-mcp__execute_code`). */
   toolPrefixes: string[];
+  /** Canonical prefix shared by all this MCP's tools, computed by probe.
+   * Empty string means "not yet probed — use the static MCP_PREFIX default". */
+  prefix: string;
   notes?: string;
 }
