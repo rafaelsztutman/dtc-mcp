@@ -11,20 +11,25 @@ const codeShape = {
 };
 
 const description = `
-Execute JavaScript against the typed Klaviyo + Shopify SDKs in an isolated V8 sandbox.
+Execute JavaScript against the typed Klaviyo + Shopify SDKs in a stateful V8 sandbox.
 
-The sandbox replaces 22 hand-built tools from v0.2 — write whatever query, aggregation,
-or cross-platform composition you need in code. The host applies rate limits, auth, and
-caching transparently.
+The host applies rate limits, auth, and caching transparently. The sandbox keeps one
+context alive per MCP connection — variables you assign to globalThis persist across
+calls, so iterative analyses don't re-fetch.
 
 Available globals:
 - klaviyo: { get, post, paginate, campaigns, flows, lists, segments, profiles, events, metrics, reporting }
 - shopify: { gql, ql, timezone } — Shopify Admin GraphQL + ShopifyQL
 - console: { log, error, warn, info } — captured and returned as stdout
+- pick(value, schema) / topN(arr, n, by) / summarize(arr, opts) — output-discipline helpers
+- globalThis.* — assignments persist across calls within this MCP session
 
-Use search_docs first to find the SDK method that fits your task. Method calls return
-the raw API JSON (JSON:API for Klaviyo, GraphQL response for Shopify) — destructure
-or transform inline.
+Discovery: use read_doc({}) at session start to list every available SDK path, then
+read_doc({ path }) for any chunk's signature and example. Use search_docs for
+intent-based queries when the path is not known.
+
+The host caps return values at ~100 KB; oversized returns are replaced with a
+truncation envelope. Use pick/topN/summarize to stay under the cap.
 
 Example (top 5 campaigns by revenue last 30d):
   const metricId = await klaviyo.getConversionMetricId();
@@ -35,7 +40,7 @@ Example (top 5 campaigns by revenue last 30d):
       statistics: ["recipients", "open_rate", "click_rate", "conversion_value"],
     }}
   });
-  return report.data.attributes.results.sort((a, b) => b.statistics.conversion_value - a.statistics.conversion_value).slice(0, 5);
+  return topN(report.data.attributes.results, 5, (r) => r.statistics.conversion_value);
 `.trim();
 
 export function registerExecuteCode(server: McpServer): void {

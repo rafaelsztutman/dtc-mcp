@@ -1,140 +1,129 @@
-# dtc-mcp v1.5
+# dtc-mcp
 
-**Code-execution MCP for DTC e-commerce. Three architectural moves beyond Stainless.**
+**A code-execution MCP server for Klaviyo + Shopify analytics.**
 
-The LLM writes TypeScript against typed Klaviyo + Shopify SDKs in a sandbox — instead of picking from a long menu of pre-built tools. v1.5 takes the Stainless / Cloudflare / Anthropic "code execution + docs search" pattern and adds three things none of them ship:
-
-1. **Stateful sandbox sessions.** Variables on `globalThis` persist across `execute_code` calls within the same MCP connection. Stainless's Cloudflare-Workers sandbox is stateless per call; ours isn't. Iterative DTC analyses don't re-fetch.
-2. **Code-as-docs via `read_doc`.** Adopts Anthropic's [filesystem-as-API pattern](https://www.anthropic.com/engineering/code-execution-with-mcp) — direct chunk fetch by exact path, cheaper than re-searching when the LLM already knows what it wants.
-3. **Output projection contracts.** In-sandbox `pick` / `topN` / `summarize` helpers + a host-side 100 KB response cap. Directly attacks the published 53% factuality ceiling of code-mode MCP (models over-return; we give them the vocabulary to be disciplined AND enforce a ceiling).
-
-Plus everything v1.0 already had: hybrid sidecar runner that works inside Claude Desktop's Electron hardened-runtime, `node:vm` fallback when no system Node is available, self-hosted auto-updating docs via jsDelivr CDN.
-
-> v1.5 is a complete rewrite of [v0.2](https://github.com/rafaelsztutman/dtc-mcp/tree/v0.2). The 22 hand-built analytics tools are gone; in their place are three composable primitives. See **Migration from v0.2** below.
-
-Inspired by [Stainless's SDK Code Mode](https://www.stainless.com/blog/sdk-code-mode), [Cloudflare's Code Mode](https://blog.cloudflare.com/code-mode-mcp/), and Anthropic's [Code Execution with MCP](https://www.anthropic.com/engineering/code-execution-with-mcp) — extended where the literature shows soft spots.
-
-## The three tools
-
-### `execute_code`
-Runs JavaScript (TypeScript syntax supported, stripped via [sucrase](https://github.com/alangpierce/sucrase)) inside a **hybrid sandbox**:
-
-- **Preferred runner — sidecar [isolated-vm](https://github.com/laverdet/isolated-vm)**: a fresh V8 isolate per call (separate heap, 128 MB hard limit, hard timeout). The sidecar is a child Node process spawned at MCP server startup from the user's system Node binary. This indirection exists because Claude Desktop is Electron + macOS hardened runtime + Library Validation, which refuses to dlopen native modules whose code signature doesn't share Anthropic's Team ID. See **Sandbox architecture** below.
-- **Fallback runner — `node:vm`**: in-process sandbox. Activates automatically when no system Node ≥ 20 is found, or when the sidecar crashes. Weaker isolation but no extra requirements. Each result includes a `sandbox` field so the LLM (and you) can see which mode ran.
-
-Globals exposed in both modes:
-- `klaviyo` — typed client wrapping the Klaviyo REST API (`get`, `post`, `paginate`, plus `campaigns`, `flows`, `lists`, `segments`, `profiles`, `events`, `metrics`, `reporting.{campaignValues,flowValues}`)
-- `shopify` — typed client for Shopify Admin GraphQL + ShopifyQL (`gql`, `ql`, `timezone`)
-- `console.{log,error,warn,info}` — captured and returned to the caller as `stdout`
-- `pick(value, schema)` / `topN(arr, n, by)` / `summarize(arr, opts)` — output-discipline helpers. Use these to project / aggregate raw API responses before returning. See `guide.output-discipline`.
-- `globalThis.*` — assignments persist across calls within the same MCP connection. See `guide.stateful-sessions`.
-
-The host applies rate limiting, auth, and caching transparently — Klaviyo's dual-tier limiter (1/s reporting, 10/s standard), Shopify's GraphQL cost budget, and a 10-min reporting POST cache all carry over from v0.2's battle-tested implementations.
-
-Defaults: 30s wall-clock, 128 MB heap (sidecar only). Opt-in `// @timeout 2m` (max 5m).
-
-```js
-// Top 5 email campaigns by revenue, last 30 days, with names hydrated.
-const metricId = await klaviyo.getConversionMetricId();
-const report = await klaviyo.reporting.campaignValues({
-  data: { type: "campaign-values-report", attributes: {
-    timeframe: { key: "last_30_days" },
-    conversion_metric_id: metricId,
-    statistics: ["recipients", "open_rate", "conversion_value"],
-  }}
-});
-const top = report.data.attributes.results
-  .sort((a, b) => b.statistics.conversion_value - a.statistics.conversion_value)
-  .slice(0, 5);
-for (const r of top) {
-  const { data } = await klaviyo.campaigns.get(r.groupings.campaign_id, { "fields[campaign]": "name" });
-  r.name = data.attributes.name;
-}
-return top;
-```
-
-### `search_docs`
-Searches the bundled SDK reference (MiniSearch / BM25) for method signatures, parameter docs, and runnable recipes. Use this **before** writing code in `execute_code` — it tells the LLM exactly which methods are exposed and how to call them.
-
-Docs are auto-refreshed daily from [dtc-mcp-docs](https://github.com/rafaelsztutman/dtc-mcp-docs) via jsDelivr CDN (with ETag negotiation). New Klaviyo / Shopify API revisions land without a new MCP release.
-
-### `read_doc`
-Fetches a specific docs chunk by exact path, or lists all available paths when called with no args. Use after `search_docs` to fetch one chunk's full content without paying the search round-trip — or call `read_doc({})` at session start to map out the entire SDK surface in one go.
-
-```js
-read_doc({ path: "klaviyo.reporting.campaignValues" })  // single chunk
-read_doc({ platform: "shopify" })                       // list Shopify paths
-read_doc({})                                            // list all 332 paths
-```
-
-## Sandbox architecture
-
-The preferred sandbox runs `isolated-vm` in a sidecar process. Why a sidecar:
-
-> Claude Desktop is an Electron app whose main binary is signed with hardened
-> runtime + macOS Library Validation. Native modules loaded into Claude
-> Desktop must share Anthropic's Team ID. We can't sign `isolated-vm` with
-> Anthropic's cert, and ad-hoc signing has no Team ID — so the native module
-> is refused at `dlopen`. A child process spawned from the user's system
-> `node` binary has its own (unrestricted) hardened-runtime status, so
-> isolated-vm loads cleanly there.
+Three tools. Typed SDKs. A V8 sandbox that keeps state across calls so iterative analyses don't re-fetch. Works inside Claude Desktop, Cursor, or any MCP client.
 
 ```
-┌─ Claude Desktop (Electron, hardened runtime) ────────────────┐
-│                                                               │
-│  Main MCP server (Electron's bundled Node)                    │
-│  ├ search_docs       MiniSearch BM25 over data/docs.json      │
-│  ├ execute_code      proxies to ↓                             │
-│  ├ host SDK          Klaviyo + Shopify clients (rate limit,   │
-│  │                   auth, cache — same code as v0.2)         │
-│  └ sidecar manager   spawn / lifecycle / NDJSON over stdio    │
-│                                                               │
-└─────────────────────────────│─────────────────────────────────┘
-                              │ newline-delimited JSON-RPC
-┌─ Sidecar (system /usr/local/bin/node — outside Electron) ────┐
-│                                                               │
-│  isolated-vm loads (no Library Validation here)               │
-│                                                               │
-│  Per execute request:                                         │
-│  ┌─ Fresh V8 isolate ───────────────────────────────────┐    │
-│  │ • 128 MB heap limit, hard wall-clock timeout         │    │
-│  │ • No fetch / process / require / fs / env / globals  │    │
-│  │ • klaviyo + shopify proxies → __host_invoke ────────╮│    │
-│  │ • console capture → stdout                          ││    │
-│  └─────────────────────────────────────────────────────╯│    │
-│                                                          │    │
-└──────────────────────────────────────────────────────────│────┘
-                                                           │
-                                          (host-call round-trip
-                                           back to main MCP for
-                                           the actual HTTP call,
-                                           rate-limited there)
+LLM asks → execute_code → V8 sandbox ─→ host bridge ─→ Klaviyo / Shopify
+                              ↑                             ↓
+                         globalThis state            rate limit + cache
+                         persists across calls
 ```
-
-If discovery fails (no Node ≥ 20 on the system) or the sidecar crashes, `execute_code` automatically falls back to an in-process `node:vm` runner with documented threat-model caveats (mistake fence, not a security boundary). The tool result includes a `sandbox: "sidecar"` or `sandbox: "vm"` field so the LLM (and you) can see which mode ran.
-
-Node discovery checks (in order): `DTC_MCP_NODE_PATH` env var → `which node` / `where node` → Homebrew (both archs) → standard system paths → nvm → Volta → fnm → asdf. Set `DTC_MCP_SANDBOX=vm` to force the in-process fallback, or `DTC_MCP_SANDBOX=sidecar` to require the sidecar.
-
-## Quick start
 
 ```bash
 npm install -g dtc-mcp
 ```
 
-Or via `npx`:
+Or get the one-click [Claude Desktop extension](#install).
 
-```bash
-npx dtc-mcp
+---
+
+## The three tools
+
+### `execute_code(code)`
+
+Runs JavaScript (TypeScript syntax accepted — type annotations are stripped before execution) inside a constrained V8 sandbox. The sandbox exposes typed Klaviyo and Shopify clients; the host handles auth, rate limiting, and caching invisibly.
+
+**Globals available inside the sandbox:**
+
+| | |
+|---|---|
+| `klaviyo` | `get`, `post`, `paginate`, plus typed namespaces: `campaigns`, `flows`, `lists`, `segments`, `profiles`, `events`, `metrics`, and `reporting.{campaignValues,flowValues}` |
+| `shopify` | `gql`, `ql` (ShopifyQL), `timezone` |
+| `console` | `log` / `error` / `warn` / `info` — captured and returned as `stdout` |
+| `pick(v, schema)` | Deep projection over objects / arrays |
+| `topN(arr, n, by)` | Top-N by numeric key, descending |
+| `summarize(arr, opts)` | Auto-aggregate (count, total, min/max/avg, optional topN) |
+| `globalThis.*` | Assignments persist across `execute_code` calls within the same MCP session |
+
+**Not exposed:** `fetch`, `process`, `require`, `import`, `setTimeout`, the filesystem, or any env var. The only path out of the sandbox is the typed SDK methods, which route through the host's rate limiter and cache.
+
+Defaults: 30s wall-clock per call, 128 MB heap (sidecar), 256 MB total per session. Opt-in `// @timeout 2m` at the top of the code extends the wall-clock up to 5 min.
+
+### `search_docs(query, platform?, limit?)`
+
+Full-text BM25 search over the bundled SDK reference. Returns ranked markdown chunks with signatures and runnable examples. Use this when you're discovering methods by intent ("how do I list flows with their actions?").
+
+### `read_doc(path?, platform?)`
+
+Direct fetch of a chunk by exact path, or a full listing when called with no args. Cheaper than `search_docs` once the LLM knows what it wants. Calling `read_doc({})` once at the start of a session is the recommended way to map the whole SDK surface in one shot.
+
+```js
+read_doc({})                                            // list all 332 paths
+read_doc({ path: "klaviyo.reporting.campaignValues" })  // one chunk verbatim
+read_doc({ platform: "shopify" })                       // Shopify only
 ```
 
-### Claude Desktop (Desktop Extension)
+---
 
-1. Download the latest `dtc-mcp.mcpb` from [Releases](https://github.com/rafaelsztutman/dtc-mcp/releases)
-2. Double-click to install — Claude Desktop opens an install dialog
-3. Paste your Klaviyo key (required) and Shopify creds (optional)
-4. The two tools (`execute_code`, `search_docs`) appear in the hammer menu
+## Architecture
 
-### Claude Desktop (manual config)
+The sandbox runs in one of two modes, chosen automatically at startup.
+
+### Preferred: sidecar with isolated-vm
+
+```
+┌─ Claude Desktop (Electron, hardened runtime) ────────────────┐
+│                                                               │
+│  MCP server (Electron's bundled Node)                         │
+│   ├ execute_code      proxies to ↓                            │
+│   ├ search_docs       MiniSearch BM25 over data/docs.json     │
+│   ├ read_doc          direct fetch by chunk ID                │
+│   ├ host SDK          Klaviyo + Shopify (rate limit / cache)  │
+│   └ sidecar manager   spawn / lifecycle / NDJSON over stdio   │
+│                                                               │
+└─────────────────────────────│─────────────────────────────────┘
+                              │ newline-delimited JSON-RPC
+┌─ Sidecar process (system Node, outside Electron) ────────────┐
+│                                                               │
+│  isolated-vm loads here (no Library Validation restriction)   │
+│                                                               │
+│  One long-lived V8 isolate per MCP connection:                │
+│   • 256 MB heap, 30 min idle TTL                              │
+│   • klaviyo/shopify/pick/topN/summarize injected once         │
+│   • globalThis state preserved across execute_code calls      │
+│   • host-bridge calls round-trip back to the main process     │
+│                                                               │
+└───────────────────────────────────────────────────────────────┘
+```
+
+**Why a sidecar:** Claude Desktop is an Electron app with macOS hardened runtime + Library Validation. Native modules loaded into the Claude Desktop process must share Anthropic's Team ID — which we can't sign with. Spawning the user's `/usr/local/bin/node` as a child process sidesteps the restriction; the child has its own hardened-runtime status, so `isolated-vm` loads cleanly.
+
+Node discovery walks: `DTC_MCP_NODE_PATH` env var → `which node` / `where node` → Homebrew (Intel + Apple Silicon) → standard system paths → nvm → Volta → fnm → asdf. Requires Node ≥ 20.
+
+### Fallback: in-process `node:vm`
+
+If no system Node ≥ 20 is found, or the sidecar fails to start, the server falls back to a `node:vm` runner in the main process. Sandbox surface is identical (same `globalThis`, same helpers, same state semantics), but isolation is weaker — `node:vm` is a mistake fence, not a security boundary, and can be escaped via prototype-chain tricks. Acceptable because the threat model is "the user's own LLM might write buggy code," not "an attacker is trying to escape."
+
+Every `execute_code` result includes `"sandbox": "sidecar"` or `"sandbox": "vm"` so you (and the LLM) can see which mode ran.
+
+### Stateful sessions
+
+A single sandbox context lives for the lifetime of the MCP connection. `globalThis.x = ...` in one `execute_code` call is visible in every later call. `const`/`let` declared at the top of a script are scoped to that call only — use `globalThis` for anything you want to carry forward.
+
+The context is recreated on: connection close, 30 min idle, isolate OOM, or first call after a long gap. When that happens the next result includes `"sessionReset": true` so the LLM knows prior state is gone.
+
+### Output discipline
+
+Klaviyo and Shopify endpoints return verbose JSON. The host caps any `execute_code` return value at 100 KB (configurable via `DTC_MCP_MAX_RESPONSE_KB`); oversized returns are replaced with `{ truncated: true, preview, instructions }`. The sandbox-side `pick` / `topN` / `summarize` helpers exist so the LLM can stay under the cap by design — see the `guide.output-discipline` doc chunk for examples.
+
+### Docs delivery
+
+`search_docs` and `read_doc` query an in-memory MiniSearch index built from `data/docs.json`. The bundled copy ships with ~330 chunks (hand-authored guides + recipes + auto-generated reference for every Klaviyo OpenAPI endpoint). A background fetch on startup pulls a fresher copy from `https://cdn.jsdelivr.net/gh/rafaelsztutman/dtc-mcp-docs@latest/docs.json` (ETag-cached at `~/.cache/dtc-mcp/docs.json`), so new API endpoints land without a new MCP release. Set `DTC_MCP_DOCS_REFRESH=0` for fully offline use.
+
+---
+
+## Install
+
+### Option A — Claude Desktop one-click
+
+1. Download `dtc-mcp.mcpb` from the latest [GitHub release](https://github.com/rafaelsztutman/dtc-mcp/releases).
+2. Double-click the file. Claude Desktop opens an install dialog.
+3. Paste your Klaviyo API key (required) and Shopify credentials (optional).
+4. Restart Claude Desktop. Three tools appear in the hammer menu: `execute_code`, `search_docs`, `read_doc`.
+
+### Option B — manual config (`claude_desktop_config.json`, Cursor, etc.)
 
 ```json
 {
@@ -153,7 +142,59 @@ npx dtc-mcp
 }
 ```
 
-Klaviyo-only mode: omit the `SHOPIFY_*` variables. `shopify.*` calls in the sandbox will throw a configuration error; `klaviyo.*` calls work normally.
+Klaviyo-only mode: omit the `SHOPIFY_*` variables. `shopify.*` calls throw a configuration error; `klaviyo.*` calls work normally.
+
+### Option C — npm global install
+
+```bash
+npm install -g dtc-mcp
+dtc-mcp           # runs the MCP server on stdio
+```
+
+---
+
+## Getting credentials
+
+### Klaviyo
+
+1. Log into Klaviyo. **Settings → Account → API Keys** (left sidebar).
+2. **Create Private API Key**. Name it `dtc-mcp`.
+3. Grant read-only scopes: `campaigns:read`, `flows:read`, `lists:read`, `segments:read`, `profiles:read`, `metrics:read`, `events:read`.
+4. Copy the `pk_...` key.
+
+### Shopify
+
+Two auth modes. Use whichever matches your app type.
+
+**Dev Dashboard app (recommended, required for apps created after Jan 2026):**
+
+1. Open your app in the [Shopify Partners Dashboard](https://partners.shopify.com).
+2. **Configuration → Client credentials.** Copy the Client ID and Client Secret.
+3. Required scopes: `read_orders`, `read_products`, `read_customers`, `read_inventory`, `read_reports`.
+
+Env vars:
+
+```
+SHOPIFY_STORE=your-store.myshopify.com
+SHOPIFY_CLIENT_ID=your_client_id
+SHOPIFY_CLIENT_SECRET=shpss_your_secret
+```
+
+**Legacy custom app (apps created before Jan 2026):**
+
+1. Shopify Admin → **Settings → Apps and sales channels → Develop apps**, open your app.
+2. **API credentials** → copy the Admin API access token (`shpat_...`).
+
+Env vars:
+
+```
+SHOPIFY_STORE=your-store.myshopify.com
+SHOPIFY_ACCESS_TOKEN=shpat_your_token_here
+```
+
+Do not set both auth modes at once; the server logs a warning and uses Client Credentials if both are present.
+
+---
 
 ## Environment
 
@@ -161,68 +202,49 @@ Klaviyo-only mode: omit the `SHOPIFY_*` variables. `shopify.*` calls in the sand
 |---|---|---|
 | `KLAVIYO_API_KEY` | Yes | Klaviyo private API key (`pk_...`) |
 | `SHOPIFY_STORE` | For Shopify | `*.myshopify.com` domain |
-| `SHOPIFY_CLIENT_ID` | For Shopify (Dev Dashboard) | App Client ID |
-| `SHOPIFY_CLIENT_SECRET` | For Shopify (Dev Dashboard) | App Client Secret (`shpss_...`) |
-| `SHOPIFY_ACCESS_TOKEN` | For Shopify (legacy) | Admin API token (`shpat_...`) |
+| `SHOPIFY_CLIENT_ID` | Dev Dashboard auth | App Client ID |
+| `SHOPIFY_CLIENT_SECRET` | Dev Dashboard auth | App Client Secret (`shpss_...`) |
+| `SHOPIFY_ACCESS_TOKEN` | Legacy custom app | Admin API token (`shpat_...`) |
 | `SHOPIFY_API_VERSION` | No | Default `2026-01` |
 | `KLAVIYO_CONVERSION_METRIC_ID` | No | Override auto-discovered "Placed Order" metric ID |
-| `DTC_MCP_DOCS_URL` | No | Override docs source (default: jsDelivr → `dtc-mcp-docs@latest`) |
-| `DTC_MCP_DOCS_REFRESH` | No | Set to `0` to disable the background docs refresh (offline mode) |
 | `DTC_MCP_SANDBOX` | No | `auto` (default) \| `sidecar` (require isolated-vm) \| `vm` (force `node:vm`) |
 | `DTC_MCP_NODE_PATH` | No | Absolute path to the Node binary used by the sidecar. Skips discovery. |
 | `DTC_MCP_MAX_RESPONSE_KB` | No | Cap on bytes of `execute_code` return values (default `100`). |
+| `DTC_MCP_DOCS_URL` | No | Override docs source. Default: jsDelivr → `dtc-mcp-docs@latest`. |
+| `DTC_MCP_DOCS_REFRESH` | No | Set to `0` to disable the background docs refresh (offline mode). |
 | `LOG_LEVEL` | No | `debug` \| `info` \| `warn` \| `error` (default `info`) |
 
-## Migration from v0.2
-
-Every v0.2 tool is now one `execute_code` call. The `search_docs` index ships with recipes for the most common ones:
-
-| v0.2 tool | v1.0 recipe |
-|---|---|
-| `klaviyo_campaign_summary` | `guide.recipe.top-campaigns` — paginate `klaviyo.reporting.campaignValues`, sort, hydrate names |
-| `klaviyo_flow_summary` | `klaviyo.reporting.flowValues` (cached) + `klaviyo.flows.get` |
-| `klaviyo_subscriber_health` | `klaviyo.lists.list` + `klaviyo.segments.list` + your own engagement bucketing |
-| `shopify_sales_summary` | `shopify.ql('FROM sales SHOW gross_sales, net_sales, orders SINCE -30d UNTIL today')` |
-| `shopify_sales_timeseries` | Same ShopifyQL with `GROUP BY day` |
-| `shopify_customer_cohorts` | `shopify.gql` for `customers` + your bucketing logic |
-| `dtc_dashboard` | `guide.recipe.dashboard` — `Promise.all` of Klaviyo reporting + Shopify ShopifyQL |
-| `dtc_email_revenue_attribution` | Subset of `guide.recipe.dashboard` |
-
-Run `search_docs({ query: "<your old tool name>" })` inside Claude to find the corresponding recipe.
-
-## Token budget
-
-Tool-list payload (what every client loads on connect):
-
-| | v0.2 | v1.0 |
-|---|---|---|
-| Tools | 22 | 2 |
-| `tools/list` JSON size | ~12KB | ~1.5KB |
-| Per-conversation overhead | high (every tool's schema in context) | flat (~1KB) |
-
-v1.0 trades fixed tool-list cost for variable per-call cost (the LLM writes code that runs in the sandbox). For repeated analytics in one conversation, savings compound — the sandbox is stateful per call but the host's caches (Klaviyo reporting cache, ShopifyQL cache) persist across calls.
+---
 
 ## Development
 
 ```bash
-npm install        # also builds isolated-vm via node-gyp (needs C++ toolchain)
+npm install        # installs deps, builds isolated-vm via node-gyp
 npm run build      # tsc → dist/
 npm run dev        # tsc --watch
-npm test           # vitest
-npm run inspect    # MCP Inspector — visual tool tester
+npm test           # vitest (53 tests)
+npm run inspect    # MCP Inspector — connect any client to dist/index.js
 ```
 
-### Regenerating docs / SDK types
-
-The Klaviyo OpenAPI spec and Shopify GraphQL schema change periodically. To regenerate the bundled `data/docs.json` and the SDK types locally:
+### Building the .mcpb bundle
 
 ```bash
-npm run codegen:klaviyo   # download Klaviyo OpenAPI → docs chunks
-npm run codegen:shopify   # introspect Shopify GraphQL → docs chunks
-npm run codegen:docs      # merge into data/docs.json
+tools/build-mcpb.sh           # → dtc-mcp-v<version>.mcpb in repo root
 ```
 
-In production this runs daily on a GitHub Action in [dtc-mcp-docs](https://github.com/rafaelsztutman/dtc-mcp-docs); the MCP fetches the freshest copy on the next boot. Releasing a new MCP version is **not** required for new API methods to appear in `search_docs`.
+Stages prod-only dependencies, ad-hoc code-signs native `.node` binaries (macOS requirement), and zips into a `.mcpb` ready for one-click install.
+
+### Regenerating bundled docs
+
+```bash
+npm run codegen:klaviyo   # download Klaviyo OpenAPI, emit chunk JSON
+npm run codegen:shopify   # introspect Shopify GraphQL (needs SHOPIFY_* env), emit chunks
+npm run codegen:docs      # merge guides + chunks into data/docs.json
+```
+
+In production this runs daily on a GitHub Action in [dtc-mcp-docs](https://github.com/rafaelsztutman/dtc-mcp-docs); the MCP fetches the freshest copy on the next boot.
+
+---
 
 ## License
 
