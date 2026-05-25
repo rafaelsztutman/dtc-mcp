@@ -45,6 +45,7 @@ import { estimateCellTokens, fillToolCallBytes } from "./estimator.js";
 import { constraintViolations, gradeCell } from "./grader.js";
 import { buildSubAgentPrompt, prefixFor } from "./prompt-templates.js";
 import { runMultiturnCell } from "./multiturn.js";
+import { runJudgePhase } from "./judge.js";
 import { writeReport } from "./report.js";
 import type {
   Batch,
@@ -444,6 +445,19 @@ async function cmdRecordJudge(args: {
   );
 }
 
+/**
+ * Run the judge phase end-to-end: spawn Sonnet judge sub-processes for
+ * every (cell × criterion) pending in state.json, persist verdicts as
+ * they come back. Optional --concurrency (default 4).
+ */
+async function cmdJudgeRun(args: { concurrency: number }): Promise<void> {
+  const runDir = mustFindRun();
+  const state = await readState(runDir);
+  const tasks = await loadTasks();
+  const { processed, failed } = await runJudgePhase(runDir, state, tasks, args.concurrency);
+  console.log(`Judge phase complete — processed: ${processed}, failed: ${failed}`);
+}
+
 async function cmdReport(): Promise<void> {
   const runDir = mustFindRun();
   const state = await readState(runDir);
@@ -603,6 +617,11 @@ async function main(): Promise<void> {
     case "judge-plan":
       await cmdJudgePlan();
       break;
+    case "judge-run":
+      await cmdJudgeRun({
+        concurrency: args.concurrency ? parseInt(args.concurrency as string, 10) : 4,
+      });
+      break;
     case "multiturn":
       if (!args.cell) {
         console.error("Usage: cli.ts multiturn --cell <cellId>");
@@ -625,7 +644,7 @@ async function main(): Promise<void> {
       break;
     default:
       console.error(
-        "Commands: init | state | plan | record | grade | report | probe | calibrate | multiturn | judge-plan | record-judge",
+        "Commands: init | state | plan | record | grade | report | probe | calibrate | multiturn | judge-plan | judge-run | record-judge",
       );
       process.exit(1);
   }
