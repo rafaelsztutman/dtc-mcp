@@ -322,6 +322,19 @@ function spawnClaude(stdin: string): Promise<string> {
         // tell where turn boundaries are (the only `user` events in the
         // default output are tool-result echoes).
         "--replay-user-messages",
+        // Auto-approve every tool call in the child process. The bench
+        // harness is fully scripted — prompts come from versioned JSON in
+        // bench/tasks/, not user input — so there's no interactive human
+        // to approve permission prompts. Without this flag, MCP tools
+        // that aren't in the user's existing allowlist (e.g. klaviyo's
+        // get_segments) silently get denied and the agent's response is
+        // "I can't do this without permission", which looks like a tool
+        // failure but is really a permission gate. The risk surface: a
+        // prompt injection from API data could try to call an unintended
+        // tool. Mitigated by the read-only task scope and the fact that
+        // these MCPs only expose Klaviyo/Shopify APIs that don't have
+        // destructive write paths the agent would reach from a read flow.
+        "--dangerously-skip-permissions",
       ],
       {
         cwd: PROJECT_ROOT,
