@@ -5,7 +5,7 @@
   "claims": [
     { "type": "list-size", "expected": 5, "description": "exactly 5 campaigns returned" },
     { "type": "fields-present", "expected": ["id", "name", "send_time"], "description": "each item has id, name, send_time" },
-    { "type": "ordering", "expected": "descending", "description": "ordered by send_time descending" }
+    { "type": "ordering", "expected": "descending", "field": "send_time", "description": "ordered by send_time descending" }
   ],
   "notes": "Single tool call should suffice (get_campaigns with filter + sort)."
 }

@@ -40,6 +40,10 @@ export interface Claim {
   expected: unknown;
   /** Numeric tolerance — only used by `contains-number`. */
   tolerance?: number;
+  /** Field name hint — only used by `ordering` to pin which field to sort
+   * by. Without this, the grader guesses the first orderable field, which
+   * can pick the wrong one when multiple fields look numeric or date-like. */
+  field?: string;
   /** Human-readable description for the report. */
   description?: string;
 }

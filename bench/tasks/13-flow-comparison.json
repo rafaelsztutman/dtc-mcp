@@ -10,7 +10,7 @@
   "claims": [
     { "type": "list-size", "expected": 3, "description": "3 flows compared" },
     { "type": "fields-present", "expected": ["name", "conversion_rate"], "description": "each item has name and conversion_rate" },
-    { "type": "ordering", "expected": "descending", "description": "ordered by conversion_rate descending" }
+    { "type": "ordering", "expected": "descending", "field": "conversion_rate", "description": "ordered by conversion_rate descending" }
   ],
   "reportingHeavy": true,
   "notes": "Multi-turn + reporting. Tests aggregating per-flow reports."

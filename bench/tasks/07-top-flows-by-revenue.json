@@ -5,7 +5,7 @@
   "claims": [
     { "type": "list-size", "expected": 3, "description": "top 3 flows" },
     { "type": "fields-present", "expected": ["name", "revenue"], "description": "each item has name and revenue" },
-    { "type": "ordering", "expected": "descending", "description": "ordered by revenue descending" }
+    { "type": "ordering", "expected": "descending", "field": "revenue", "description": "ordered by revenue descending" }
   ],
   "reportingHeavy": true,
   "notes": "Hits flow-values-reports endpoint — same throttling tier as campaign reports."

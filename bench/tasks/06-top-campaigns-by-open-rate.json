@@ -5,7 +5,7 @@
   "claims": [
     { "type": "list-size", "expected": 3, "description": "top 3 campaigns" },
     { "type": "fields-present", "expected": ["name", "open_rate"], "description": "each item has name and open_rate" },
-    { "type": "ordering", "expected": "descending", "description": "ordered by open_rate descending" }
+    { "type": "ordering", "expected": "descending", "field": "open_rate", "description": "ordered by open_rate descending" }
   ],
   "reportingHeavy": true,
   "notes": "Hits campaign-values-reports — Klaviyo throttles at 1/s burst, 2/min sustained. Pacing adds +8s."

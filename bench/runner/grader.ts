@@ -131,11 +131,15 @@ function matchOrdering(claim: Claim, text: string): ClaimGrade {
   if (parsed === null) {
     return { claim, passed: false, reason: `no parseable list found` };
   }
-  const numericKey = findNumericKey(parsed);
-  if (!numericKey) {
-    return { claim, passed: false, reason: `no numeric field to check ordering` };
+  // Prefer the explicit field hint; fall back to first orderable field.
+  const orderableKey =
+    (claim.field && itemsHaveOrderableField(parsed, claim.field))
+      ? claim.field
+      : findOrderableKey(parsed);
+  if (!orderableKey) {
+    return { claim, passed: false, reason: `no orderable field (number or ISO date) to check ordering` };
   }
-  const values = parsed.map((item) => Number((item as Record<string, unknown>)[numericKey]));
+  const values = parsed.map((item) => coerceOrderable((item as Record<string, unknown>)[orderableKey]));
   let ok = true;
   for (let i = 1; i < values.length; i++) {
     if (expected.startsWith("desc") && values[i] > values[i - 1]) {
@@ -150,7 +154,7 @@ function matchOrdering(claim: Claim, text: string): ClaimGrade {
   return {
     claim,
     passed: ok,
-    reason: `expected ${expected} order on field "${numericKey}"`,
+    reason: `expected ${expected} order on field "${orderableKey}"`,
   };
 }
 
@@ -188,15 +192,41 @@ function tryParseList(text: string): unknown[] | null {
   }
 }
 
-function findNumericKey(items: unknown[]): string | null {
+function findOrderableKey(items: unknown[]): string | null {
   if (items.length === 0) return null;
   const first = items[0];
   if (!first || typeof first !== "object") return null;
   for (const [k, v] of Object.entries(first as Record<string, unknown>)) {
-    if (typeof v === "number") return k;
-    if (typeof v === "string" && Number.isFinite(Number(v))) return k;
+    if (Number.isFinite(coerceOrderable(v))) return k;
   }
   return null;
+}
+
+function itemsHaveOrderableField(items: unknown[], field: string): boolean {
+  return items.every(
+    (item) =>
+      !!item &&
+      typeof item === "object" &&
+      field in (item as object) &&
+      Number.isFinite(coerceOrderable((item as Record<string, unknown>)[field])),
+  );
+}
+
+/** Coerce a value into a number suitable for ordering. Accepts plain
+ * numbers, numeric strings, and strings starting with an ISO-8601 date
+ * (YYYY-MM-DD…). Free-form prose that happens to mention a date — e.g. a
+ * campaign name "Birthday Sale May 23, 2026" — is intentionally rejected
+ * because Date.parse is too lenient and would silently match the wrong
+ * field. Returns NaN when not orderable. */
+const ISO_DATE_PREFIX = /^\d{4}-\d{2}-\d{2}/;
+function coerceOrderable(v: unknown): number {
+  if (typeof v === "number") return v;
+  if (typeof v !== "string") return NaN;
+  const asNum = Number(v);
+  if (Number.isFinite(asNum)) return asNum;
+  if (!ISO_DATE_PREFIX.test(v)) return NaN;
+  const asDate = Date.parse(v);
+  return Number.isFinite(asDate) ? asDate : NaN;
 }
 
 /**
