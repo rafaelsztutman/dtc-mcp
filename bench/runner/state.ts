@@ -118,9 +118,12 @@ export function initState(
         // the gap when it tries to plan a batch.
         continue;
       }
-      for (const mcp of def.mcps) {
-        if (task.applies_to && !task.applies_to.includes(mcp)) continue;
-        for (let trial = 1; trial <= TRIALS_PER_CELL; trial++) {
+      // Order: trial → mcp (so within a task we get
+      // dtc/1, klv/1, dtc/2, klv/2 — incremental head-to-head signal
+      // surfaces after every pair instead of after every full task).
+      for (let trial = 1; trial <= TRIALS_PER_CELL; trial++) {
+        for (const mcp of def.mcps) {
+          if (task.applies_to && !task.applies_to.includes(mcp)) continue;
           const id = cellIdFor(task.id, mcp, trial);
           cellIds.push(id);
           cells[id] = {
