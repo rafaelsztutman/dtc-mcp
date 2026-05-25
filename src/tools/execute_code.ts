@@ -26,7 +26,16 @@ Available globals:
 
 Discovery: use read_doc({}) at session start to list every available SDK path, then
 read_doc({ path }) for any chunk's signature and example. Use search_docs for
-intent-based queries when the path is not known.
+intent-based queries when the path is not known. STRONGLY RECOMMENDED: if you have
+not used a method before in this session, call search_docs FIRST — the SDK uses
+JSON:API conventions (e.g. valid sort keys, sparse fieldsets) that don't match
+the patterns most JS SDKs follow.
+
+Param shapes the SDK accepts (both work, the host normalizes):
+- Canonical:    { 'page[size]': '20', 'fields[campaign]': 'name,status' }
+- JS-idiomatic: { pageSize: 20, fields: { campaign: ['name', 'status'] } }
+Common method aliases (e.g. klaviyo.campaigns.getCampaigns) are also accepted and
+route to the canonical .list()/.get().
 
 The host caps return values at ~100 KB; oversized returns are replaced with a
 truncation envelope. Use pick/topN/summarize to stay under the cap.

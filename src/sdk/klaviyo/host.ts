@@ -94,7 +94,10 @@ async function withRetry<T>(fn: () => Promise<T>, max = 3): Promise<T> {
 }
 
 export interface KlaviyoGetOptions {
-  params?: Record<string, string>;
+  /** Query params. Accepts both JSON:API canonical (`'page[size]': '20'`)
+   * and JS-idiomatic shapes (`pageSize: 20`, `fields: { campaign: [...] }`);
+   * `normalizeKlaviyoParams()` translates the latter at call time. */
+  params?: Record<string, unknown>;
   tier?: RateLimitTier;
 }
 
@@ -106,13 +109,17 @@ export interface KlaviyoPostOptions {
  * GET a Klaviyo endpoint. Returns the raw JSON:API response.
  * Bracket params (`page[size]`, `fields[campaign]`) are NOT percent-encoded
  * because Klaviyo's parser doesn't handle the encoded form.
+ *
+ * `params` is normalized through `normalizeKlaviyoParams()` so common
+ * JS-idiomatic forms (`pageSize`, `fields: {campaign: [...]}`) translate
+ * to the JSON:API bracket forms Klaviyo actually accepts.
  */
 export async function klaviyoGet(
   path: string,
   options: KlaviyoGetOptions = {},
 ): Promise<unknown> {
   const tier = options.tier ?? "standard";
-  const params = options.params ?? {};
+  const params = normalizeKlaviyoParams(options.params ?? {});
   return withRetry(async () => {
     await limiterFor(tier).acquire();
     let url = `${BASE_URL}/${path.replace(/^\//, "")}`;
@@ -127,6 +134,51 @@ export async function klaviyoGet(
     return handleResponse(await fetch(url, { headers: headers() }));
   });
 }
+
+/**
+ * Translate LLM-friendly param shapes to Klaviyo's JSON:API bracket form.
+ * Accepts both shapes so agents that reach for camelCase or nested objects
+ * don't waste a roundtrip + retry. Rules:
+ *   - `pageSize` → `page[size]`, `pageCursor` → `page[cursor]`
+ *   - `fields: { campaign: ['name','status'] }` → `'fields[campaign]': 'name,status'`
+ *   - Any value that's not a string is coerced via String() (booleans/numbers
+ *     are valid query values; arrays become comma-joined strings)
+ * Already-canonical bracket keys pass through unchanged.
+ */
+export function normalizeKlaviyoParams(
+  input: Record<string, unknown>,
+): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const [key, raw] of Object.entries(input)) {
+    if (raw === undefined || raw === null) continue;
+
+    if (key === "fields" && typeof raw === "object" && !Array.isArray(raw)) {
+      for (const [resource, value] of Object.entries(raw as Record<string, unknown>)) {
+        out[`fields[${resource}]`] = Array.isArray(value)
+          ? (value as unknown[]).join(",")
+          : String(value);
+      }
+      continue;
+    }
+    if (key === "page" && typeof raw === "object" && !Array.isArray(raw)) {
+      for (const [sub, value] of Object.entries(raw as Record<string, unknown>)) {
+        out[`page[${sub}]`] = String(value);
+      }
+      continue;
+    }
+
+    const alias = KLAVIYO_PARAM_ALIASES[key];
+    const canonicalKey = alias ?? key;
+    out[canonicalKey] = Array.isArray(raw) ? (raw as unknown[]).join(",") : String(raw);
+  }
+  return out;
+}
+
+const KLAVIYO_PARAM_ALIASES: Record<string, string> = {
+  pageSize: "page[size]",
+  pageCursor: "page[cursor]",
+  pageCount: "page[count]",
+};
 
 /**
  * POST to a Klaviyo endpoint. Used primarily for reporting endpoints.

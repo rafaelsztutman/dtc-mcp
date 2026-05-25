@@ -77,7 +77,7 @@
     "platform": "klaviyo",
     "category": "method",
     "summary": "List campaigns (sugar for klaviyo.get('campaigns', ...)).",
-    "content": "## klaviyo.campaigns.list(params?)\n\nSee https://developers.klaviyo.com/en/reference/get_campaigns. Filter syntax required — at minimum a `filter` param scoping to a channel.\n\n```js\nconst { data } = await klaviyo.campaigns.list({\n  filter: 'equals(messages.channel,\"email\")',\n  sort: '-send_time',\n  'page[size]': '20',\n  'fields[campaign]': 'name,status,send_time',\n});\nreturn data.map(c => ({ id: c.id, ...c.attributes }));\n```",
+    "content": "## klaviyo.campaigns.list(params?)\n\nSee https://developers.klaviyo.com/en/reference/get_campaigns. Filter syntax required — at minimum a `filter` param scoping to a channel.\n\nValid `sort` values: `created_at`, `updated_at`, `scheduled_at`, `id`, `name` (prefix with `-` for descending). NOTE: `send_time` is a response field but is NOT a valid sort key — use `-scheduled_at` to get the most-recently-sent campaigns first.\n\n```js\nconst { data } = await klaviyo.campaigns.list({\n  filter: 'equals(messages.channel,\"email\")',\n  sort: '-scheduled_at',\n  'page[size]': '20',\n  'fields[campaign]': 'name,status,send_time,scheduled_at',\n});\nreturn data.map(c => ({ id: c.id, ...c.attributes }));\n```",
     "tags": ["klaviyo", "campaigns", "list"]
   },
   {
