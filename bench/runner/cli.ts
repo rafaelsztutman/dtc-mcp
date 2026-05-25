@@ -44,6 +44,7 @@ import {
 import { estimateCellTokens, fillToolCallBytes } from "./estimator.js";
 import { constraintViolations, gradeCell } from "./grader.js";
 import { buildSubAgentPrompt, prefixFor } from "./prompt-templates.js";
+import { runMultiturnCell } from "./multiturn.js";
 import { writeReport } from "./report.js";
 import type {
   Batch,
@@ -51,9 +52,7 @@ import type {
   CellResult,
   Mcp,
   McpMetadata,
-  RunState,
   Task,
-  ToolCall,
   Trajectory,
 } from "./types.js";
 
@@ -339,6 +338,74 @@ async function cmdJudgePlan(): Promise<void> {
   console.log(JSON.stringify({ runDir, pendingJudgeWork: work }, null, 2));
 }
 
+/**
+ * Run a cell end-to-end via the multi-turn harness (`claude -p` + stream-json
+ * stdin). Spawns ONE claude CLI invocation per cell so the MCP transport (and
+ * therefore dtc-mcp's per-connection sandbox state) survives across all
+ * user turns. Records the result into state.json directly — no separate
+ * `record` step needed.
+ */
+async function cmdMultiturn(args: { cell: CellId }): Promise<void> {
+  const runDir = mustFindRun();
+  const state = await readState(runDir);
+  const cell = state.cells[args.cell];
+  if (!cell) {
+    console.error(`Unknown cell: ${args.cell}`);
+    process.exit(1);
+  }
+  const tasks = await loadTasks();
+  const task = tasks.find((t) => t.id === cell.taskId);
+  if (!task) {
+    console.error(`No task definition for ${cell.taskId}`);
+    process.exit(1);
+  }
+
+  const metadata = state.mcpMetadata[cell.mcp];
+  const prefix = prefixFor(cell.mcp, metadata);
+
+  console.error(
+    `[multiturn] starting ${args.cell} (mcp=${cell.mcp}, prefix=${prefix})`,
+  );
+  const submission = await runMultiturnCell(task, cell.mcp, prefix);
+
+  // Constraint check on the parsed trajectory.
+  const violations = constraintViolations(
+    { ...cell, trajectory: submission.trajectory },
+    prefix,
+  );
+  const isInvalid = violations.length > 0;
+
+  // Fill bytes + estimate (best-effort; will mostly be 0s since we don't
+  // capture per-tool I/O from claude's stream-json).
+  submission.trajectory.toolCalls = submission.trajectory.toolCalls.map(fillToolCallBytes);
+  const estimatedTokens = estimateCellTokens(
+    { ...cell, trajectory: submission.trajectory },
+    metadata,
+    state.tokenTariff,
+  ).total;
+
+  await recordCell(runDir, args.cell, {
+    response: submission.response,
+    usage: submission.usage,
+    turns: submission.turns,
+    trajectory: submission.trajectory,
+    estimatedTokens,
+    status: isInvalid ? "invalid" : "recorded",
+    error: isInvalid
+      ? `Constraint violation: called tools outside ${prefix} — ${violations.join(", ")}`
+      : undefined,
+    startedAt: submission.startedAt,
+    finishedAt: submission.finishedAt,
+  });
+
+  console.log(
+    `Recorded ${args.cell} (multiturn) — status: ${isInvalid ? "invalid" : "recorded"}, real tokens: ${submission.usage.totalTokens}, duration: ${submission.usage.durationMs}ms, turns: ${submission.turns.length}, tool calls: ${submission.trajectory.toolCalls.length}`,
+  );
+  if (isInvalid) {
+    console.log(`  Violations: ${violations.join(", ")}`);
+  }
+}
+
 /** Record one judge verdict for one (cell, criterion-index) pair. */
 async function cmdRecordJudge(args: {
   cell: CellId;
@@ -536,6 +603,13 @@ async function main(): Promise<void> {
     case "judge-plan":
       await cmdJudgePlan();
       break;
+    case "multiturn":
+      if (!args.cell) {
+        console.error("Usage: cli.ts multiturn --cell <cellId>");
+        process.exit(1);
+      }
+      await cmdMultiturn({ cell: args.cell as CellId });
+      break;
     case "record-judge":
       if (!args.cell || args["criterion-index"] === undefined || !args._positional) {
         console.error(
@@ -551,7 +625,7 @@ async function main(): Promise<void> {
       break;
     default:
       console.error(
-        "Commands: init | state | plan | record | grade | report | probe | calibrate | judge-plan | record-judge",
+        "Commands: init | state | plan | record | grade | report | probe | calibrate | multiturn | judge-plan | record-judge",
       );
       process.exit(1);
   }

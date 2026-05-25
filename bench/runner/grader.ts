@@ -38,7 +38,11 @@ function mean(xs: number[]): number {
 
 /**
  * Validate that a sub-agent stayed within its assigned MCP. Returns the
- * names of any tool calls that violated the prefix. Empty array = clean.
+ * names of any MCP tool calls that violated the prefix. Empty array = clean.
+ *
+ * Only `mcp__*`-prefixed tool calls are subject to the constraint. Claude
+ * Code's own infrastructure tools (ToolSearch, Bash, Read, etc.) are
+ * orthogonal to the MCP-isolation question and are not flagged.
  */
 export function constraintViolations(
   cell: CellResult,
@@ -47,5 +51,5 @@ export function constraintViolations(
   if (!cell.trajectory) return [];
   return cell.trajectory.toolCalls
     .map((tc) => tc.name)
-    .filter((name) => !name.startsWith(expectedPrefix));
+    .filter((name) => name.startsWith("mcp__") && !name.startsWith(expectedPrefix));
 }
