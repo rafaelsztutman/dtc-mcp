@@ -1,0 +1,25 @@
+{
+  "id": "09-long-campaign-postmortem-and-strategy",
+  "category": "long",
+  "user_turns": [
+    "Find my most recent email campaign that had a below-average open rate (compared to my account's typical open rate over the last 90 days).",
+    "What was the subject line on that campaign?",
+    "Roughly how big was the audience it sent to?",
+    "What was its click rate?",
+    "Now find me my best-performing email campaign from the same calendar week — by open rate.",
+    "What was the subject line of the best one?",
+    "Were the two campaigns sent to similar-sized audiences, or wildly different?",
+    "Were they sent to the same list/segment, or different ones?",
+    "Based on the comparison — subject lines, audiences, segments — what are 2 or 3 plausible hypotheses for why one outperformed the other?",
+    "Pick the strongest hypothesis and give me one concrete A/B test I could run on next week's send to validate it."
+  ],
+  "judge_criteria": [
+    "The final A/B test recommendation traces to the strongest hypothesis identified in turn 9 — not a new idea.",
+    "The hypotheses in turn 9 (which the final answer builds on) reference at least one specific difference uncovered in turns 1–8: subject line, audience size, or segment targeting.",
+    "The final test is specific enough to actually run — it names what variable to vary and what to measure, not 'try sending at a different time'.",
+    "The two campaigns being compared are consistently referenced — the underperformer from turn 1 and the over-performer from turn 5 — without swapping or merging them.",
+    "No fabricated campaigns, subjects, or audiences appear in the final recommendation."
+  ],
+  "reportingHeavy": true,
+  "notes": "10-turn long conversation modeling a marketing-ops postmortem. Two campaigns get traced through 8 turns of side-by-side investigation before the agent has to synthesize hypotheses and propose an experiment. The synthesis at turns 9–10 is impossible without retaining both campaigns' subject lines, audience sizes, click rates, and targeting from turns 1–8. dtc-mcp can keep both campaign records as named globalThis variables (e.g. globalThis.under, globalThis.over) — easy reference at synthesis time. klaviyo-mcp must re-rehearse 8 turns of tool-result payloads."
+}

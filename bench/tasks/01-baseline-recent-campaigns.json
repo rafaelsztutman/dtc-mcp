@@ -1,0 +1,13 @@
+{
+  "id": "01-baseline-recent-campaigns",
+  "category": "baseline",
+  "user_prompt": "Show me my 5 most recently sent email campaigns.",
+  "judge_criteria": [
+    "The answer identifies 5 email campaigns (or fewer if the account has fewer sent campaigns).",
+    "The listed campaigns are ordered newest-to-oldest by send date.",
+    "Each campaign includes at minimum a name or identifier so the user can recognize it.",
+    "The answer is scoped to email campaigns specifically — not SMS, push, or other channels.",
+    "No fabricated or hallucinated campaign names appear."
+  ],
+  "notes": "Baseline single-turn task. Establishes the floor for both MCPs on a trivial list call — what does a one-shot question cost? Used as the reference point for measuring how per-turn costs compound at longer conversations."
+}

@@ -1,0 +1,17 @@
+{
+  "id": "04-short-welcome-flow-deep-dive",
+  "category": "short",
+  "user_turns": [
+    "Pull up my welcome flow and give me the basics — what triggers it, how many messages, and how it's performed over the last 30 days (revenue, recipients, open rate).",
+    "How does its open rate compare to the average across all my live flows in that same 30-day window?"
+  ],
+  "judge_criteria": [
+    "The final answer reports the welcome flow's open rate as a concrete number or percentage.",
+    "The final answer reports the average open rate across live flows as a concrete number or percentage.",
+    "A direct comparison is made — either as a difference, ratio, or a clear 'above/below average' verdict.",
+    "Both rates are within a plausible range (0–100% or 0–1 as a fraction).",
+    "The comparison uses the same 30-day window for both sides — not a window mismatch."
+  ],
+  "reportingHeavy": true,
+  "notes": "2-turn short conversation. Turn 1 establishes one flow's performance (specific drill-down); turn 2 is a comparative question that requires either re-using turn-1 data plus fetching a broader aggregate, or re-fetching both. Tests whether the MCP can carry forward the welcome flow's open rate into the comparison without re-pulling it."
+}

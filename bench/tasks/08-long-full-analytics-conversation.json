@@ -1,0 +1,26 @@
+{
+  "id": "08-long-full-analytics-conversation",
+  "category": "long",
+  "user_turns": [
+    "Give me a quick health-check on my Klaviyo account — how many campaigns sent in the last 30 days, how many flows currently live, and roughly how many active profiles.",
+    "Drill into campaigns — which one generated the most attributed revenue over that 30-day window?",
+    "Which one generated the least, among campaigns that actually sent to a real audience (skip the test sends)?",
+    "Give me the subject lines for both of those.",
+    "Now switch to flows — which live flow generated the most revenue over the same 30 days?",
+    "What's that flow's trigger?",
+    "How does that top flow's revenue compare to the top campaign's revenue from earlier? Which is bigger and by how much?",
+    "What are my 3 largest segments right now by profile count?",
+    "Of those 3, do any of them appear to overlap with the audience that the top-revenue flow is sending to?",
+    "Wrap this up as 3 bullet points I can paste into a CEO update — the health snapshot, the revenue winners, and one insight about audience/segment overlap."
+  ],
+  "judge_criteria": [
+    "The final 3 bullets reference the specific top campaign and top flow identified in earlier turns — not new entities.",
+    "The 'revenue winners' bullet correctly identifies whether the top flow or top campaign was bigger (consistent with turn 7's comparison).",
+    "The audience/segment overlap insight references one of the 3 segments named in turn 8.",
+    "The health snapshot bullet includes the campaign-count, flow-count, and profile-count numbers from turn 1.",
+    "No metric, campaign, flow, or segment is fabricated in the final bullets — every claim traces to an earlier turn.",
+    "The final output is genuinely 3 bullets in a CEO-ready format (not a long prose dump or a rehash of every turn)."
+  ],
+  "reportingHeavy": true,
+  "notes": "10-turn long conversation. This is the headline 'analyst standup' task — the kind of conversation a Klaviyo power user would have day-to-day. The synthesis at turn 10 requires referencing data from turns 1, 2, 5, 7, and 8. dtc-mcp's stateful sandbox lets the agent stash each piece in globalThis as it goes and assemble cleanly; klaviyo-mcp must either re-fetch (expensive) or rely on the LLM's working memory of earlier tool-result payloads (which may have been cache-compacted by turn 10). Strong expected gap."
+}

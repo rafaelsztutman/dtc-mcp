@@ -1,0 +1,14 @@
+{
+  "id": "02-baseline-top-flow-revenue",
+  "category": "baseline",
+  "user_prompt": "Which of my live Klaviyo flows generated the most attributed revenue in the last 30 days?",
+  "judge_criteria": [
+    "The answer identifies a single specific flow by name or ID as the top-revenue flow.",
+    "Revenue is reported as a concrete dollar amount (not a range or qualitative descriptor).",
+    "The window matches the asked period — last 30 days.",
+    "Only live (currently active) flows are considered, not draft or archived.",
+    "Numbers are aggregated across all messages in the flow — not a single message's revenue presented as the flow's total."
+  ],
+  "reportingHeavy": true,
+  "notes": "Baseline single-turn reporting-endpoint task. Hits flow-values-reports. The aggregation criterion catches the per-message vs per-flow bug that v1.0.4 docs addressed."
+}

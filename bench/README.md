@@ -1,33 +1,57 @@
 # dtc-mcp benchmark
 
-Head-to-head comparison of `dtc-mcp` v1.0.4 against Klaviyo's official MCP server on Klaviyo-only analytics tasks.
+Head-to-head comparison of `dtc-mcp` v1.0.4+ against Klaviyo's official MCP server on Klaviyo-only analytics tasks, organized along the **conversation-length axis**.
 
 > This is a **portfolio benchmark**, not a peer-reviewed one. The methodology is documented honestly and the raw trajectories are committed so anyone can re-run, re-grade, or challenge the numbers.
 
+## The thesis
+
+Most MCP servers are designed around single-shot tool calls — the model picks a tool, sends one request, reads one response. Real LLM usage is conversational: an analyst asks a question, then a follow-up, then drills in, then synthesizes. Each follow-up turn pays for the previous turn's tool-result bytes again, because tool-list MCPs serialize fresh JSON payloads on every call and the agent has to keep the prior data in its conversation context to reference it later.
+
+dtc-mcp takes a different shape: one `execute_code` tool backed by a stateful V8 sandbox per MCP connection. Prior tool calls' data live in `globalThis` and are addressable from later calls — no need to re-serialize them through the conversation. The hypothesis under test: **as conversation length grows, dtc-mcp's per-turn cost stays flat or shrinks while tool-list MCPs scale up**, so the headline gap should compound with turn count.
+
+The benchmark is built to test that specifically.
+
 ## What it measures
 
-For each of 15 tasks × 2 MCPs × 3 trials (= 90 cells):
+For each of 9 tasks × 2 MCPs × 2 trials (= 36 cells):
 
-- **Estimated tokens** — sum of tool-definition bytes (× turns), tool I/O payload bytes, and final response bytes, divided by a calibrated tariff (default 4 bytes/token). Honest assumption: NO prompt cache.
-- **Tool calls** — count of MCP tool invocations the sub-agent made.
-- **Wall-clock duration** — time from sub-agent spawn to final response.
-- **Pass rate** — fraction of task-level claims satisfied by the final answer (claims-based grading + LLM-as-judge for fuzzy claims).
+- **Real tokens** — pulled from the `<result>` event's `usage` block in `claude -p --output-format stream-json`: `input + cache_creation + output` (cache reads excluded, matches `<usage>` footer convention).
+- **Tool calls** — count of MCP tool invocations parsed from the assistant events.
+- **Wall-clock duration** — total time the `claude -p` invocation took, end-to-end.
+- **Per-turn breakdown** — turn-by-turn responses and approximate per-turn token allocation (aggregate `÷` turn count, since stream-json doesn't expose per-turn usage natively).
+- **Pass rate** — fraction of judge_criteria evaluated `PASS` by a Sonnet sub-agent (PARTIAL = 0.5).
+
+## Task structure
+
+Nine tasks across four turn-count buckets:
+
+| Bucket | Turns | Tasks | Examples |
+|---|---|---|---|
+| Baseline | 1 | 3 | "Show me my 5 most recently sent campaigns" |
+| Short | 2 | 2 | Welcome-flow deep dive; 3-campaign comparison |
+| Medium | 5 | 2 | Campaign-performance investigation; segment-engagement deep dive |
+| Long | 10 | 2 | Full analyst standup; campaign postmortem + strategy |
+
+Each task is **a natural user question** — no JSON-format mandates, no "you're being benchmarked" framing. The harness adds a single minimal MCP-routing hint to the first turn (`Use the \`mcp__<server>__*\` tools to answer this question`) so the agent picks the assigned MCP, and that's the whole instrumentation envelope.
+
+The 9 tasks live in `bench/tasks/*.json`. See each file for the prompt + judge criteria.
 
 ## Constraints driving the design
 
-- **No Anthropic API access** — we use Claude Max sub-agents instead. Token counts are estimated, not measured from `usage.input_tokens`.
-- **Max 5-hour quota window** — the run is split into 6 batches (A–F) that the user authorizes one at a time.
-- **Live Klaviyo account** — run all trials within a tight time window so reporting data doesn't shift between MCPs.
+- **No Anthropic API access** — we use the user's Claude Max subscription via the `claude -p` CLI. One `claude -p` invocation = one MCP transport, so dtc-mcp's per-connection sandbox state survives across all turns of a multi-turn cell.
+- **Max-plan quota window** — the run is split into 4 batches (A–D) that the user authorizes one at a time. Long-bucket cells (10 turns each) can take 4–8 minutes per cell, so quota planning matters.
+- **Live Klaviyo account** — strictly sequential pacing, with extra buffer around reporting-endpoint cells, to keep below the 2/min sustained throttle on reporting endpoints.
 
 ## Quick start
 
 ### Prerequisites
 
-1. **Both MCPs installed in Claude Code.** The user's `~/.claude.json` (or per-project `.claude.json`) needs both:
+1. **Both MCPs installed at the user level** in `~/.claude.json`. The `claude -p` child process won't see project-level `.mcp.json` configs unless they're explicitly trusted.
    ```json
    "mcpServers": {
      "dtc-mcp": { "command": "npx", "args": ["-y", "dtc-mcp"], "env": { "KLAVIYO_API_KEY": "pk_..." } },
-     "klaviyo":  { "command": "klaviyo-mcp-server", "env": { "PRIVATE_API_KEY": "pk_..." } }
+     "klaviyo": { "command": "klaviyo-mcp-server", "env": { "PRIVATE_API_KEY": "pk_..." } }
    }
    ```
    Install Klaviyo's official MCP with `pip install klaviyo-mcp-server` (or `pipx install klaviyo-mcp-server`).
@@ -49,12 +73,12 @@ tsx runner/cli.ts init
 tsx runner/cli.ts probe tools-list-dump.json
 
 # Run one batch at a time via the Claude Code slash command:
-#   /bench --batch A     # 15 cells, ~15 min
-#   /bench --batch B
-#   /bench --batch C
-#   /bench --batch D
-#   /bench --batch E
-#   /bench --batch F     # finalizes + writes report.md
+#   /bench --batch A     # 12 cells, baseline (1 turn)
+#   /bench --batch B     #  8 cells, short (2 turns)
+#   /bench --batch C     #  8 cells, medium (5 turns)
+#   /bench --batch D     #  8 cells, long (10 turns)
+# Or run a single cell directly:
+#   tsx runner/cli.ts multiturn --cell 06-medium-campaign-performance-investigation::dtc-mcp::trial-1
 
 # Or query progress any time:
 tsx runner/cli.ts state
@@ -75,8 +99,7 @@ The `probe` command needs the actual `tools/list` payload from each MCP. Capture
   },
   "klaviyo-mcp": {
     "toolList": [
-      { "name": "mcp__klaviyo__get_campaigns", "description": "..." },
-      { "name": "mcp__klaviyo__get_campaign", "description": "..." },
+      { "name": "mcp__klaviyo__klaviyo_get_campaigns", "description": "..." },
       ...
     ]
   }
@@ -90,28 +113,34 @@ bench/
 ├── README.md            ← this file
 ├── package.json         ← tsx, vitest
 ├── tsconfig.json
-├── tasks/               ← 15 task definitions (JSON, one per file)
+├── tasks/               ← 9 task definitions (JSON, one per file)
 ├── runner/
-│   ├── cli.ts           ← deterministic bookkeeping (init/state/plan/record/grade/report)
-│   ├── types.ts         ← Task, Trial, RunState, etc.
+│   ├── cli.ts           ← deterministic bookkeeping (init/state/plan/multiturn/record/grade/report)
+│   ├── multiturn.ts     ← spawns `claude -p` and parses stream-json
+│   ├── types.ts         ← Task, CellResult, RunState, etc.
 │   ├── state.ts         ← state.json read/write + batch planning
-│   ├── prompt-templates.ts ← sub-agent prompt builder + judge prompt
-│   ├── estimator.ts     ← byte → token estimator
-│   ├── grader.ts        ← claims-based grading
+│   ├── prompt-templates.ts ← MCP routing hint + judge prompt builder
+│   ├── estimator.ts     ← byte → token estimator (legacy; real tokens come from claude stream)
+│   ├── grader.ts        ← aggregate judge verdicts → score
 │   └── report.ts        ← markdown report generator
-└── results/<runId>/
+└── results/<runId>/     ← gitignored
     ├── state.json       ← single source of truth, resumable
-    ├── tmp/             ← per-cell sub-agent outputs (intermediate)
-    ├── raw.jsonl        ← every trajectory recorded
+    ├── tmp/             ← per-cell intermediate dumps
     └── report.md        ← the publishable summary
 ```
 
 ## Methodology details
 
-### Why batches (A–F)
+### Why `claude -p` with stream-json
 
-Sub-agents consume Max-plan quota. A full run is ~90 cells × ~40s each ≈ 60 min of sub-agent time at strictly sequential pacing (see below); even one batch is meaningful in isolation. The 6-batch split lets the user:
-- Pause between batches as quota allows
+The breakthrough that made the multi-turn axis testable: one `claude -p --input-format stream-json --output-format stream-json --verbose --replay-user-messages` invocation keeps ONE CLI process alive, which means ONE MCP transport for the whole trajectory. dtc-mcp's per-connection sandbox state — verified empirically to survive across turns within a single invocation but NOT across separate `claude -p --resume` calls — is the property the long-bucket tasks are designed to exercise.
+
+This is the τ²-bench (Sierra) / BFCL v3 multi-turn pattern: one script holds the chat history list AND the tool transport open for the whole trajectory. We adopted it after confirming that Claude Code's `Agent` tool spawns a FRESH MCP connection per sub-agent, which would defeat the cross-turn stateful-sandbox signal.
+
+### Why batches (A–D)
+
+A full run is 36 cells. Batch D alone (long-conversation, 10 turns × 8 cells) can take ~50 minutes of `claude -p` time. The 4-batch split lets the user:
+- Pause between batches as Max-plan quota allows
 - Inspect intermediate state and abort if early results look bogus
 - Resume cleanly from `state.json` after restart
 
@@ -119,24 +148,20 @@ Sub-agents consume Max-plan quota. A full run is ~90 cells × ~40s each ≈ 60 m
 
 The benchmark hits a live Klaviyo account. Bursty access could trip rate-limit detection and (worse) flag the account. To stay below the radar:
 
-- **`concurrency: 1`** by default — one sub-agent at a time. Never parallel.
+- **`concurrency: 1`** by default — one cell at a time. Never parallel.
 - **`baseDelayMs: 3000`** — minimum 3-second gap between any two cells.
-- **`reportingDelayMs: 8000`** — extra 8-second gap before any cell that hits Klaviyo's `campaign-values-reports` or `flow-values-reports` endpoints (those tiers are throttled at 1/s burst, 2/min sustained).
-- **`mcpSwitchDelayMs: 10000`** — extra 10-second gap when switching between dtc-mcp and klaviyo-mcp cells, since both share the same per-account budget.
+- **`reportingDelayMs: 8000`** — extra 8-second gap before any cell that hits Klaviyo's `campaign-values-reports` or `flow-values-reports` endpoints (1/s burst, 2/min sustained, 225/day).
+- **`mcpSwitchDelayMs: 10000`** — extra 10-second gap when switching MCPs.
 
-Per-cell pacing is computed by `bench/runner/cli.ts plan` and surfaced to the sub-agent runner. Total estimated wall-clock per batch is in the plan JSON's `totalEstSeconds` field. Pacing settings live in `state.json` under `pacing` so they can be tweaked per-run.
+Per-cell pacing is computed by `cli.ts plan` and surfaced in the plan JSON's `delayBeforeMs` field. Pacing settings live in `state.json` under `pacing` so they can be tweaked per-run.
 
-### Why claims-based grading
+### Why claims-based grading (LLM-as-judge)
 
-Live Klaviyo data shifts (campaigns get sent, reports update). Exact-match grading isn't viable for most tasks. Each task defines a list of **verifiable claims** (e.g. "list contains exactly 5 items", "all items have field `name`", "ordered by `revenue` descending"). The grader checks each claim against the final answer. Tasks where claims are inherently fuzzy ("explain WHY campaign X performed best") get an LLM-as-judge claim, deferred to batch F.
-
-### Why estimated tokens
-
-The Anthropic API exposes `usage.input_tokens` directly, but Max-plan sub-agents don't surface that to the parent agent. We work around this by recording every tool-call payload's byte size and using a calibrated bytes/token tariff (default 4, refined in Phase 2 against the published Anthropic tokenizer on sample payloads). The estimate is intentionally **conservative against prompt caching** — we assume tool definitions are re-loaded every turn. Real-world cache hits would only widen the gap that the benchmark reports, not narrow it.
+Live Klaviyo data shifts (campaigns get sent, reports update). Exact-match grading isn't viable. Each task defines a list of natural-language `judge_criteria` (e.g. "the answer identifies 5 email campaigns", "no fabricated subject lines appear"). A Sonnet sub-agent grades each criterion against the cell's final-turn response (PASS / PARTIAL / FAIL). We deliberately use Sonnet, not Opus, to avoid self-enhancement bias when judging Opus-generated responses.
 
 ### Constraint enforcement
 
-Sub-agents in Claude Code see ALL configured MCPs. The prompt template explicitly instructs each sub-agent to use only one MCP's prefix. After every cell is recorded, `cli.ts record` scans the captured trajectory; any tool call outside the allowed prefix marks the trial as `invalid`, and it's re-run. Sub-agent self-reported `tool_calls` are ignored in favor of the trajectory-based ground truth.
+The harness prepends a one-line MCP routing hint to the first turn of every cell — "Use the `mcp__<server>__*` tools to answer this question." After the cell runs, `cli.ts multiturn` scans the parsed trajectory; any `mcp__*`-prefixed tool call outside the allowed server marks the cell `invalid` and it can be re-run with `--retry`. Claude Code's own infrastructure tools (Bash, Read, ToolSearch, etc.) are orthogonal and not flagged.
 
 ### What's NOT in the benchmark
 
@@ -148,11 +173,12 @@ Sub-agents in Claude Code see ALL configured MCPs. The prompt template explicitl
 
 | Decision | Tradeoff |
 |---|---|
-| Sub-agents, not direct API | $0 cost, but token counts are estimated |
+| `claude -p` CLI + Claude Max | $0 marginal cost, but consumes Max-plan quota |
 | Live API data | Realistic numbers, but reruns won't reproduce exactly |
-| 3 trials per cell | Variance signal without huge cost; not pass@k |
+| 2 trials per cell | Variance signal at half the cost of 3; a 3rd trial can be added per cell if needed |
 | Claude Opus 4.7 only | Comparable to Stainless's published numbers; misses model-tier scaling |
 | Klaviyo-only tasks | Fair comparison; doesn't showcase dtc-mcp's Shopify advantage |
+| Per-turn token split is uniform | Stream-json reports only aggregate usage; per-turn cost is `aggregate ÷ turns` (rough — first turn carries tool-definition load and is typically heaviest) |
 
 ## License
 

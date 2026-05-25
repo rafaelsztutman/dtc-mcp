@@ -35,41 +35,46 @@ const DEFAULT_PACING: PacingConfig = {
  * rename) so a crash mid-update doesn't corrupt the checkpoint.
  */
 
-const TRIALS_PER_CELL = 3;
+/**
+ * Two trials per cell — enough to spot variance, light enough to fit a
+ * single Max-plan quota window for the full 36-cell sweep. If two trials
+ * disagree wildly, the runner can be invoked with a manual `--retry` for
+ * a third trial on the disputed cell.
+ */
+const TRIALS_PER_CELL = 2;
 
+/**
+ * Batches are organized along the conversation-length axis (baseline →
+ * long). Each batch runs both MCPs back-to-back so reporting-endpoint
+ * cache warming and time-of-day drift affect both sides equally. The
+ * hypothesis under test: as turn count grows, dtc-mcp's stateful sandbox
+ * keeps tokens flat or shrinking (results from prior turns live in
+ * globalThis) while tool-list MCPs re-serialize full payloads each turn,
+ * so the gap should compound with conversation length.
+ */
 const BATCH_DEFINITIONS: Record<
   Batch,
   { tasks: string[]; mcps: Mcp[]; description: string }
 > = {
   A: {
-    tasks: ["01", "02", "03", "04", "05"],
-    mcps: ["dtc-mcp"],
-    description: "Single-fact category, dtc-mcp side (5 tasks × 1 mcp × 3 trials = 15 cells)",
+    tasks: ["01", "02", "03"],
+    mcps: ["dtc-mcp", "klaviyo-mcp"],
+    description: "Baseline (1 turn) — 3 tasks × 2 MCPs × 2 trials = 12 cells",
   },
   B: {
-    tasks: ["01", "02", "03", "04", "05"],
-    mcps: ["klaviyo-mcp"],
-    description: "Single-fact category, klaviyo-mcp side (5 × 1 × 3 = 15 cells)",
+    tasks: ["04", "05"],
+    mcps: ["dtc-mcp", "klaviyo-mcp"],
+    description: "Short conversation (2 turns) — 2 × 2 × 2 = 8 cells",
   },
   C: {
-    tasks: ["06", "07", "08", "09", "10", "11"],
-    mcps: ["dtc-mcp"],
-    description: "Multi-step composition, dtc-mcp side (6 × 1 × 3 = 18 cells)",
+    tasks: ["06", "07"],
+    mcps: ["dtc-mcp", "klaviyo-mcp"],
+    description: "Medium conversation (5 turns) — 2 × 2 × 2 = 8 cells",
   },
   D: {
-    tasks: ["06", "07", "08", "09", "10", "11"],
-    mcps: ["klaviyo-mcp"],
-    description: "Multi-step composition, klaviyo-mcp side (6 × 1 × 3 = 18 cells)",
-  },
-  E: {
-    tasks: ["12", "13", "14"],
+    tasks: ["08", "09"],
     mcps: ["dtc-mcp", "klaviyo-mcp"],
-    description: "Cross-resource & multi-turn, both MCPs (3 × 2 × 3 = 18 cells)",
-  },
-  F: {
-    tasks: ["15"],
-    mcps: ["dtc-mcp", "klaviyo-mcp"],
-    description: "Output discipline (1 × 2 × 3 = 6 cells) + LLM-as-judge over fuzzy claims from all prior batches + final report",
+    description: "Long conversation (10 turns) — 2 × 2 × 2 = 8 cells",
   },
 };
 

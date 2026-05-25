@@ -12,11 +12,19 @@
 
 // ─── Task definitions (input) ──────────────────────────────────────────────
 
+/**
+ * Conversation-length buckets. The benchmark is organized along the
+ * turn-count axis to test the hypothesis that MCPs not designed for
+ * conversation continuity pay a compounding cost as turns grow. dtc-mcp
+ * holds per-MCP-connection sandbox state, so prior-turn results are
+ * directly addressable from later turns; tool-list MCPs re-serialize
+ * full payloads each turn.
+ */
 export type Category =
-  | "single-fact"
-  | "multi-step"
-  | "cross-resource"
-  | "output-discipline";
+  | "baseline"   // 1 turn
+  | "short"      // 2 turns
+  | "medium"     // 5 turns
+  | "long";      // 10 turns
 
 export type Mcp = "dtc-mcp" | "klaviyo-mcp";
 
@@ -145,7 +153,7 @@ export type CellStatus =
 
 // ─── State.json (the run's checkpoint) ─────────────────────────────────────
 
-export type Batch = "A" | "B" | "C" | "D" | "E" | "F";
+export type Batch = "A" | "B" | "C" | "D";
 
 export interface BatchPlan {
   batch: Batch;

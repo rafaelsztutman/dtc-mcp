@@ -1,0 +1,20 @@
+{
+  "id": "06-medium-campaign-performance-investigation",
+  "category": "medium",
+  "user_turns": [
+    "What's my top-performing sent email campaign by open rate over the last 90 days?",
+    "How does that compare to the median open rate across all my campaigns in that same window?",
+    "What was the subject line of that top campaign?",
+    "And how did it do on click rate — was the open-rate winner also strong on clicks?",
+    "Wrap it up: based on what you've pulled, what's the one-line takeaway about what's working for me right now?"
+  ],
+  "judge_criteria": [
+    "The final summary references the specific top campaign identified in turn 1 — not a different campaign.",
+    "The final summary references both the open-rate and click-rate findings from earlier turns.",
+    "The final summary is a single coherent takeaway, not a re-listing of metrics.",
+    "No campaign or metric is fabricated in the final summary that wasn't surfaced in earlier turns.",
+    "The takeaway addresses 'what's working' — actionable framing, not just a fact restatement."
+  ],
+  "reportingHeavy": true,
+  "notes": "5-turn medium conversation. The arc is: discover → contextualize → drill down → drill further → synthesize. The final summary is judged. dtc-mcp should be able to keep the top campaign's ID + subject line + metrics live in globalThis across all 5 turns; klaviyo-mcp must rely on the LLM's running conversation memory and re-issue lookups when context gets noisy."
+}

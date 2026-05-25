@@ -1,0 +1,16 @@
+{
+  "id": "05-short-campaign-comparison",
+  "category": "short",
+  "user_turns": [
+    "Pull my 3 most recently sent email campaigns and show me their open rates and click rates.",
+    "Which of those 3 performed best overall, and what stood out about it compared to the other two?"
+  ],
+  "judge_criteria": [
+    "The final answer identifies one of the 3 campaigns from turn 1 as the best performer.",
+    "The 'best performer' verdict is justified by referencing specific metrics (open rate, click rate, or both) — not asserted without evidence.",
+    "The comparison only references campaigns that were named/listed in turn 1 — no new campaigns introduced in turn 2.",
+    "Concrete numbers (not adjectives only) are used to explain what stood out."
+  ],
+  "reportingHeavy": true,
+  "notes": "2-turn short conversation. Turn 2 explicitly asks the agent to reason over data it already pulled. A stateful sandbox can reference the prior result directly; a tool-list MCP either re-fetches or relies on its conversation memory to reconstruct the comparison."
+}

@@ -1,0 +1,20 @@
+{
+  "id": "07-medium-segment-engagement-deep-dive",
+  "category": "medium",
+  "user_turns": [
+    "What's my largest active segment right now? Give me the name and the profile count.",
+    "Of my last 10 sent email campaigns, which ones targeted that segment specifically?",
+    "Of those targeted campaigns, which one had the best open rate?",
+    "What was the subject line and send date of that best one?",
+    "Wrap it up: is this segment over- or under-served by my recent campaign activity? Give me one-line takeaway."
+  ],
+  "judge_criteria": [
+    "The final answer references the specific segment named in turn 1 — not a different segment.",
+    "The final answer's verdict (over-served, under-served, or balanced) is justified by the campaign-targeting counts surfaced across turns 2–4.",
+    "The 'best targeted campaign' identified in turn 3 is referenced consistently in the final summary.",
+    "The takeaway addresses the served/under-served question — not a generic 'engagement is good' restatement.",
+    "No campaign or segment is fabricated in the final summary."
+  ],
+  "reportingHeavy": true,
+  "notes": "5-turn medium. Cross-resource (segments × campaigns). The targeting check (turn 2) requires inspecting campaign audience filters; some campaigns target lists rather than segments, and the agent has to reason about that. The dtc-mcp advantage: keep segment_id, targeted campaign list, and best-campaign metadata in sandbox state for the final synthesis."
+}

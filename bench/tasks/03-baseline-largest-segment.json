@@ -1,0 +1,12 @@
+{
+  "id": "03-baseline-largest-segment",
+  "category": "baseline",
+  "user_prompt": "Which of my Klaviyo segments has the most profiles in it right now?",
+  "judge_criteria": [
+    "The answer identifies a single specific segment by name as the largest.",
+    "The profile count is reported as a concrete number.",
+    "The answer is about segments, not lists or other Klaviyo audience types.",
+    "No fabricated segment names appear."
+  ],
+  "notes": "Baseline single-turn task on a different resource type (segments) so the baseline batch isn't a single endpoint repeated three times. Segment profile counts come from the segment resource's `profile_count` attribute or via a count query."
+}
