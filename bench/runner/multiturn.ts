@@ -42,8 +42,12 @@ const BENCH_DIR = resolve(HERE, "..");
 const PROJECT_ROOT = resolve(BENCH_DIR, "..");
 
 /** Default claude -p timeout. Multi-turn cells with reporting endpoints
- * can run 2-3 min easily — set a roomy upper bound. */
-const CLAUDE_TIMEOUT_MS = 10 * 60 * 1000;
+ * can run 2-3 min easily; 10-turn long-conversation cells against the
+ * segments resource (where dtc-mcp's agent has to discover Klaviyo's
+ * `additional-fields[segment]=profile_count` workaround each run, then
+ * fetch with the 1/s rate limit) have been observed at 9+ min. Set
+ * roomy enough that no legitimate completion gets cut off. */
+const CLAUDE_TIMEOUT_MS = 20 * 60 * 1000;
 
 export interface MultiturnSubmission {
   response: string;
