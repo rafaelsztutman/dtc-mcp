@@ -1,17 +1,17 @@
 {
   "id": "13-flow-comparison",
   "category": "cross-resource",
-  "prompt": "(multi-turn, see turns)",
-  "turns": [
-    { "prompt": "List 3 active flows from this Klaviyo account. Report their ids and names." },
-    { "prompt": "For each of those 3 flows, pull its conversion rate (or conversion count) over the last 30 days." },
-    { "prompt": "Return `final_answer` as a JSON array of exactly 3 objects, each with fields: name, conversion_rate. Order by conversion_rate descending." }
+  "user_prompt": "(multi-turn — see user_turns)",
+  "user_turns": [
+    "Show me 3 flows that are currently live.",
+    "For each, what's their conversion rate over the last 30 days?",
+    "Rank them best to worst by conversion rate."
   ],
-  "claims": [
-    { "type": "list-size", "expected": 3, "description": "3 flows compared" },
-    { "type": "fields-present", "expected": ["name", "conversion_rate"], "description": "each item has name and conversion_rate" },
-    { "type": "ordering", "expected": "descending", "field": "conversion_rate", "description": "ordered by conversion_rate descending" }
+  "judge_criteria": [
+    "The final ranking lists 3 specific live flows from the account.",
+    "Each flow has its conversion rate reported as a concrete number.",
+    "The flows are ordered from highest conversion rate to lowest.",
+    "Conversion rates are plausible (between 0% and 100%, or 0–1 if fractions)."
   ],
-  "reportingHeavy": true,
-  "notes": "Multi-turn + reporting. Tests aggregating per-flow reports."
+  "reportingHeavy": true
 }

@@ -1,17 +1,17 @@
 {
   "id": "12-campaign-deep-dive",
   "category": "cross-resource",
-  "prompt": "(multi-turn, see turns)",
-  "turns": [
-    { "prompt": "Find the most recently sent campaign in this Klaviyo account. Report its id and name." },
-    { "prompt": "Now pull the open rate and click rate for that campaign over the period since it was sent." },
-    { "prompt": "Summarize in `final_answer` as a JSON array containing a single object with fields: name, send_time, open_rate, click_rate." }
+  "user_prompt": "(multi-turn — see user_turns)",
+  "user_turns": [
+    "What's the most recent email campaign I sent?",
+    "How did it perform — open rate and click rate?",
+    "Summarize the key details in one short paragraph."
   ],
-  "claims": [
-    { "type": "list-size", "expected": 1, "description": "single-item array" },
-    { "type": "fields-present", "expected": ["name", "send_time", "open_rate", "click_rate"], "description": "all four fields present" },
-    { "type": "judge", "expected": "The open_rate and click_rate values are plausible decimals between 0 and 1 (or percentages between 0 and 100) for a real campaign.", "description": "rates look plausible" }
+  "judge_criteria": [
+    "The final summary names a specific real campaign from the account (with name or send date).",
+    "The summary includes both open rate and click rate as concrete numbers.",
+    "The open and click rates are plausible values (between 0% and 100%, or 0–1 if fractions).",
+    "The summary reads as a one-paragraph plain-English answer, not a JSON dump or bullet list."
   ],
-  "reportingHeavy": true,
-  "notes": "Multi-turn. Tests state retention across turns + reporting endpoint."
+  "reportingHeavy": true
 }

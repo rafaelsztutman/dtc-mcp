@@ -1,12 +1,12 @@
 {
   "id": "10-engagement-trend-7-days",
   "category": "multi-step",
-  "prompt": "Query the 'Opened Email' metric and return a daily series of values for the last 7 days. Put the answer inside `final_answer` as a JSON array of exactly 7 objects, each with fields: date, value. Order by date ascending (oldest first).",
-  "claims": [
-    { "type": "list-size", "expected": 7, "description": "7 daily buckets" },
-    { "type": "fields-present", "expected": ["date", "value"], "description": "each bucket has date and value" },
-    { "type": "judge", "expected": "The 7 date strings are ordered chronologically ascending (oldest first), with no duplicates and one entry per calendar day.", "description": "dates are in correct chronological order" }
+  "user_prompt": "How has email open volume trended over the last 7 days? Give me a daily number.",
+  "judge_criteria": [
+    "The answer provides 7 distinct daily values (one per day for the last 7 days).",
+    "Each value has a date label so the user can tell which day it refers to.",
+    "Days are presented in chronological order (oldest first or newest first, but consistent).",
+    "Values are concrete numbers (open counts or aggregate values), not vague."
   ],
-  "reportingHeavy": true,
-  "notes": "Uses query_metric_aggregates. Date ordering goes to the judge because the structural grader can only sort by numeric keys."
+  "reportingHeavy": true
 }

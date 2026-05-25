@@ -1,12 +1,12 @@
 {
   "id": "08-campaign-vs-flow-revenue",
   "category": "multi-step",
-  "prompt": "Compare total attributed revenue from campaigns vs flows over the last 30 days. You will need to pull both campaign reports and flow reports and sum the revenue across each. Put the answer inside `final_answer` as a JSON array containing a single object with fields: campaigns_revenue, flows_revenue, winner. The `winner` field must be either the string \"campaigns\" or the string \"flows\".",
-  "claims": [
-    { "type": "list-size", "expected": 1, "description": "single comparison object returned" },
-    { "type": "fields-present", "expected": ["campaigns_revenue", "flows_revenue", "winner"], "description": "object has both revenue totals and a winner" },
-    { "type": "judge", "expected": "The winner field correctly identifies which channel had higher revenue based on the two numeric fields in the same object.", "description": "winner matches the larger revenue side" }
+  "user_prompt": "Last 30 days — which made me more money, campaigns or flows?",
+  "judge_criteria": [
+    "The answer makes a clear directional comparison: campaigns won, flows won, or they were roughly equal.",
+    "The answer cites both a campaigns total and a flows total (in revenue or comparable units).",
+    "The conclusion (which one won) is consistent with the numbers given.",
+    "Numbers are concrete, not vague."
   ],
-  "reportingHeavy": true,
-  "notes": "Stresses two reporting endpoints + aggregation. Judge claim verifies the comparison was made correctly."
+  "reportingHeavy": true
 }

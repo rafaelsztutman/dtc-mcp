@@ -1,12 +1,12 @@
 {
   "id": "06-top-campaigns-by-open-rate",
   "category": "multi-step",
-  "prompt": "Find the top 3 sent campaigns by open rate from the last 30 days. You will need to (1) list recent campaigns and (2) pull campaign reports for each. Put the answer inside `final_answer` as a JSON array of exactly 3 objects, each with fields: name, open_rate. Order by open_rate descending.",
-  "claims": [
-    { "type": "list-size", "expected": 3, "description": "top 3 campaigns" },
-    { "type": "fields-present", "expected": ["name", "open_rate"], "description": "each item has name and open_rate" },
-    { "type": "ordering", "expected": "descending", "field": "open_rate", "description": "ordered by open_rate descending" }
+  "user_prompt": "What are my top 3 email campaigns by open rate over the last 30 days?",
+  "judge_criteria": [
+    "The answer identifies 3 specific campaigns from the last 30 days.",
+    "Each campaign has its open rate reported as a number or percentage.",
+    "The 3 campaigns are ordered from highest open rate to lowest.",
+    "Open rates are plausible values (between 0% and 100%, or 0 and 1 if a fraction)."
   ],
-  "reportingHeavy": true,
-  "notes": "Hits campaign-values-reports — Klaviyo throttles at 1/s burst, 2/min sustained. Pacing adds +8s."
+  "reportingHeavy": true
 }

@@ -1,12 +1,12 @@
 {
   "id": "07-top-flows-by-revenue",
   "category": "multi-step",
-  "prompt": "Find the top 3 flows by attributed revenue from the last 30 days. You will need to list flows and pull flow value reports for each. Put the answer inside `final_answer` as a JSON array of exactly 3 objects, each with fields: name, revenue. Order by revenue descending.",
-  "claims": [
-    { "type": "list-size", "expected": 3, "description": "top 3 flows" },
-    { "type": "fields-present", "expected": ["name", "revenue"], "description": "each item has name and revenue" },
-    { "type": "ordering", "expected": "descending", "field": "revenue", "description": "ordered by revenue descending" }
+  "user_prompt": "Which 3 flows drove the most revenue in the last 30 days?",
+  "judge_criteria": [
+    "The answer identifies 3 specific flows from the account.",
+    "Each flow has its attributed revenue reported as a number or currency amount.",
+    "The 3 flows are ordered from highest revenue to lowest.",
+    "Revenue figures are concrete (not vague like 'a lot' or 'significant')."
   ],
-  "reportingHeavy": true,
-  "notes": "Hits flow-values-reports endpoint — same throttling tier as campaign reports."
+  "reportingHeavy": true
 }

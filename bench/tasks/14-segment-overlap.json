@@ -1,18 +1,15 @@
 {
   "id": "14-segment-overlap",
   "category": "cross-resource",
-  "prompt": "(multi-turn, see turns)",
-  "turns": [
-    { "prompt": "List 2 large segments from this Klaviyo account. Report their ids, names, and approximate member counts." },
-    { "prompt": "Confirm the exact current member count for each of those 2 segments." },
-    { "prompt": "Return `final_answer` as a JSON array of exactly 2 objects, each with fields: name, count, rank. The `rank` field must be the string \"larger\" for the segment with the higher count, and \"smaller\" for the other." }
+  "user_prompt": "(multi-turn — see user_turns)",
+  "user_turns": [
+    "Pick 2 of my larger segments.",
+    "How many members are in each one right now?",
+    "Which of the two is bigger?"
   ],
-  "claims": [
-    { "type": "list-size", "expected": 2, "description": "exactly 2 segments compared" },
-    { "type": "fields-present", "expected": ["name", "count", "rank"], "description": "each item has name, count, rank" },
-    { "type": "contains-string", "expected": "larger", "description": "answer marks one segment as larger" },
-    { "type": "contains-string", "expected": "smaller", "description": "answer marks the other as smaller" },
-    { "type": "judge", "expected": "The segment marked 'larger' has a strictly greater count value than the one marked 'smaller'.", "description": "rank assignment matches actual counts" }
-  ],
-  "notes": "Multi-turn. Tests ordering judgment, not rates."
+  "judge_criteria": [
+    "Two specific segments from the account are named.",
+    "Each segment has its current member count reported as a concrete number.",
+    "The answer states which segment is bigger, and the choice matches the numbers given."
+  ]
 }

@@ -1,18 +1,17 @@
 import type { Mcp, McpMetadata, Task } from "./types.js";
 
 /**
- * Build the system + user prompt pair for a sub-agent benchmark cell. The
- * critical constraint: the sub-agent must use ONLY tools matching the
- * assigned MCP's prefix. Violations are caught post-hoc by
- * `constraintViolations()` and the trial is invalidated.
+ * Build the prompt handed to each benchmark sub-agent. Design principle:
+ * the sub-agent should see something as close to a real user question as
+ * possible. No mention of "benchmark", no "respond with a JSON object",
+ * no list of allowed tools — the only harness leak is the MCP routing
+ * hint, because we still need to enforce single-MCP isolation for the
+ * head-to-head to mean anything. Post-hoc constraint check in record
+ * catches violations.
  *
- * Claude Code exposes MCP tools with names like `mcp__<server>__<tool>`,
- * where `<server>` matches the key in the MCP config. The actual prefix
- * depends on how the user named their MCP entry — `mcp__dtc-mcp__*`,
- * `mcp__klaviyo__*`, `mcp__claude_ai_Klaviyo__*`, etc. The values below
- * are static defaults; `cli.ts probe` infers the real prefix from the
- * tools/list dump and stores it in `state.mcpMetadata[mcp].prefix`. The
- * prompt builder prefers the probed prefix when set.
+ * The MCP_PREFIX values are static defaults; cli.ts probe stores the
+ * actual prefix from the live tools/list dump in mcpMetadata.prefix and
+ * prefixFor prefers that.
  */
 
 export const MCP_PREFIX: Record<Mcp, string> = {
@@ -25,9 +24,7 @@ export function prefixFor(mcp: Mcp, metadata: McpMetadata): string {
 }
 
 export interface SubAgentPrompt {
-  /** Becomes the sub-agent's `prompt` argument to the Agent tool. */
   prompt: string;
-  /** Suggested `description` value for the Agent invocation. */
   description: string;
 }
 
@@ -38,56 +35,16 @@ export function buildSubAgentPrompt(
   metadata: McpMetadata,
 ): SubAgentPrompt {
   const prefix = prefixFor(mcp, metadata);
-  const allowedTools = metadata.toolPrefixes
-    .filter((name) => name.startsWith(prefix))
-    .map((name) => `  • ${name}`)
-    .join("\n");
 
-  const turns = task.turns
-    ? formatTurns(task.turns)
-    : `Task: ${task.prompt}`;
+  const userContent = task.user_turns
+    ? task.user_turns.map((t, i) => `Turn ${i + 1}: ${t}`).join("\n\n")
+    : task.user_prompt;
 
-  // The structured-output rule is the most important — without it, grading
-  // becomes brittle. Multi-line block; we keep it terse but unambiguous.
-  const prompt = `
-You are evaluating an MCP server in a head-to-head benchmark.
+  // The routing hint is the only benchmark-related text. Kept short and
+  // framed as a tool preference, not a constraint, so it reads naturally.
+  const prompt = `Use the \`${prefix}*\` MCP tools to answer this question. Respond as you naturally would.
 
-# Rules — follow these exactly
-
-1. You may use ONLY MCP tools whose name starts with: \`${prefix}\`
-   • Available tools matching this prefix:
-${allowedTools}
-2. Do NOT call any other MCP tools — not even read_doc, search_docs, or any
-   helper from a different server. If you find yourself reaching for one,
-   stop and proceed with only the allowed prefix.
-3. Solve the task entirely with the allowed tools. If the task is genuinely
-   impossible with this MCP, you may say so in \`final_answer\` and set
-   \`succeeded: false\`.
-4. Be concise — the benchmark rewards minimal output. Do not pad the answer
-   with explanations unless the task explicitly asks.
-
-# The task
-
-${turns}
-
-# Required response format
-
-Respond with EXACTLY one JSON object — no prose around it, no markdown
-fences. Like this:
-
-\`\`\`
-{
-  "final_answer": <string — the answer the task asked for, verbatim>,
-  "claims": [<verifiable factual statements you made, as strings>],
-  "tool_calls": <integer count of MCP tool calls you made>,
-  "succeeded": <true|false>,
-  "errors": [<any error messages you encountered, as strings>]
-}
-\`\`\`
-
-This is trial ${trial} of 3 for task ${task.id}. Other trials are run
-independently — do not assume any prior state from a previous trial.
-`.trim();
+${userContent}`;
 
   return {
     prompt,
@@ -95,67 +52,54 @@ independently — do not assume any prior state from a previous trial.
   };
 }
 
-function formatTurns(turns: Task["turns"]): string {
-  if (!turns) return "";
-  return turns
-    .map(
-      (t, i) =>
-        `Turn ${i + 1}: ${t.prompt}\n  ${
-          t.claims
-            ? `(claims for this turn: ${JSON.stringify(t.claims).slice(0, 200)})`
-            : ""
-        }`,
-    )
-    .join("\n\n");
-}
-
 /**
- * Build the LLM-as-judge prompt for a fuzzy claim. Used in batch F.
- *
- * Bias mitigations: judge sub-agent is Sonnet (not Opus, to avoid
- * self-enhancement); claim is presented first, answer second, with explicit
- * "answer YES/NO/UNCERTAIN" framing.
+ * Judge prompt for the LLM-as-judge phase. Each (cell, criterion) pair is
+ * scored independently by a Sonnet sub-agent. Bias mitigations:
+ *   - judge is Sonnet, not Opus, to avoid self-enhancement bias
+ *   - criterion appears first, response second, with explicit ternary verdict
+ *   - PARTIAL exists so the judge doesn't have to force-fit ambiguous cases
  */
 export function buildJudgePrompt(
-  claim: string,
-  finalAnswer: string,
-  taskContext: string,
+  userQuestion: string,
+  response: string,
+  criterion: string,
 ): SubAgentPrompt {
   const prompt = `
-You are an impartial grader evaluating whether a model's answer satisfies a
-specific factual claim. You are NOT evaluating the answer's overall quality —
-only whether the claim holds against the answer.
+You are an impartial grader evaluating whether a model's free-form answer to a
+user's question satisfies a specific success criterion.
 
-# Task context (for reference only, do not grade this)
-${taskContext}
-
-# Claim to verify
-"${claim}"
+# The user's question
+"""
+${userQuestion}
+"""
 
 # The model's answer
 """
-${finalAnswer}
+${response}
 """
 
-# Decision
+# Criterion to evaluate
+"${criterion}"
 
-Does the answer satisfy the claim? Respond with EXACTLY one JSON object:
+# Your decision
 
-{
-  "verdict": "YES" | "NO" | "UNCERTAIN",
-  "reason": <one short sentence explaining why>
-}
+Does the answer satisfy the criterion? Respond with EXACTLY one JSON object on
+a single line — no prose around it, no markdown fence:
+
+{"verdict": "PASS" | "FAIL" | "PARTIAL", "reason": "<one short sentence>"}
 
 Rules:
-- YES if the answer clearly supports the claim.
-- NO if the answer clearly contradicts the claim or omits required information.
-- UNCERTAIN only if the answer is ambiguous and you cannot decide.
-- Bias yourself toward NO when in doubt. False positives are worse than
-  false negatives for this benchmark.
+- PASS: the answer clearly satisfies the criterion.
+- FAIL: the answer clearly does not satisfy it, or omits required information.
+- PARTIAL: the answer addresses the criterion but only partially (e.g. answers
+  the right question with the wrong precision, or covers most but not all of
+  what was asked).
+- When uncertain between PASS and FAIL, prefer FAIL. When uncertain between
+  PARTIAL and the others, prefer PARTIAL.
 `.trim();
 
   return {
     prompt,
-    description: `Judge: ${claim.slice(0, 60)}...`,
+    description: `Judge: ${criterion.slice(0, 60)}...`,
   };
 }

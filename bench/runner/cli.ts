@@ -52,7 +52,6 @@ import type {
   Mcp,
   McpMetadata,
   RunState,
-  SubAgentReport,
   Task,
   ToolCall,
   Trajectory,
@@ -205,37 +204,46 @@ async function cmdRecord(args: {
 
   const raw = await readFile(args.resultPath, "utf8");
   const submission = JSON.parse(raw) as {
-    trajectory: Trajectory;
-    report: SubAgentReport;
+    /** Free-form text the sub-agent returned. */
+    response: string;
+    /** Real consumption parsed from the Agent tool's <usage> block. */
+    usage: { totalTokens: number; toolUses: number; durationMs: number };
+    /** Optional trajectory for constraint check + bench's byte-based estimator.
+     * Pass `{ toolCalls: [{name: "mcp__x__..."}, ...], rawResponse, durationMs }`
+     * with whatever tool names we can see in the Agent transcript. Empty/missing
+     * trajectory skips the constraint check (we lose violation detection but
+     * the response + usage are still recorded). */
+    trajectory?: Trajectory;
     startedAt?: string;
     finishedAt?: string;
   };
 
-  // Fill byte counts on every tool call so the estimator can run.
-  submission.trajectory.toolCalls = submission.trajectory.toolCalls.map(
-    fillToolCallBytes,
-  );
-
   const metadata = state.mcpMetadata[cell.mcp];
   const prefix = prefixFor(cell.mcp, metadata);
 
-  // Constraint check before grading — invalid trials don't get scored.
-  const violations = constraintViolations(
-    { ...cell, trajectory: submission.trajectory },
-    prefix,
-  );
-  const isInvalid = violations.length > 0;
+  let estimatedTokens: number | undefined;
+  let isInvalid = false;
+  let violations: string[] = [];
 
-  const tokens = estimateCellTokens(
-    { ...cell, trajectory: submission.trajectory },
-    metadata,
-    state.tokenTariff,
-  );
+  if (submission.trajectory && submission.trajectory.toolCalls.length > 0) {
+    submission.trajectory.toolCalls = submission.trajectory.toolCalls.map(fillToolCallBytes);
+    violations = constraintViolations(
+      { ...cell, trajectory: submission.trajectory },
+      prefix,
+    );
+    isInvalid = violations.length > 0;
+    estimatedTokens = estimateCellTokens(
+      { ...cell, trajectory: submission.trajectory },
+      metadata,
+      state.tokenTariff,
+    ).total;
+  }
 
   await recordCell(runDir, args.cell, {
+    response: submission.response,
+    usage: submission.usage,
     trajectory: submission.trajectory,
-    report: submission.report,
-    estimatedTokens: tokens.total,
+    estimatedTokens,
     status: isInvalid ? "invalid" : "recorded",
     error: isInvalid
       ? `Constraint violation: called tools outside ${prefix} — ${violations.join(", ")}`
@@ -245,7 +253,7 @@ async function cmdRecord(args: {
   });
 
   console.log(
-    `Recorded ${args.cell} — status: ${isInvalid ? "invalid" : "recorded"}, est. tokens: ${tokens.total}, tool calls: ${submission.trajectory.toolCalls.length}`,
+    `Recorded ${args.cell} — status: ${isInvalid ? "invalid" : "recorded"}, real tokens: ${submission.usage.totalTokens}, duration: ${submission.usage.durationMs}ms${estimatedTokens !== undefined ? `, est: ${estimatedTokens}` : ""}`,
   );
   if (isInvalid) {
     console.log(`  Violations: ${violations.join(", ")}`);
@@ -268,13 +276,89 @@ async function cmdGrade(args: { cell?: CellId }): Promise<void> {
     if (!task) continue;
     const outcome = gradeCell(cell, task);
     if (!outcome) continue;
-    cell.grades = outcome.grades;
     cell.score = outcome.score;
     cell.status = "graded";
     graded++;
   }
   await writeState(runDir, state);
   console.log(`Graded ${graded} cells.`);
+}
+
+/**
+ * Print pending judge work. Each (cell, criterion) needs one Sonnet
+ * sub-agent run. The /bench skill (or the user manually) spawns those
+ * and feeds results back via `cli.ts record-judge`.
+ */
+async function cmdJudgePlan(): Promise<void> {
+  const runDir = mustFindRun();
+  const state = await readState(runDir);
+  const tasks = await loadTasks();
+  const taskById = new Map(tasks.map((t) => [t.id, t]));
+
+  const work: Array<{
+    cellId: CellId;
+    criterionIndex: number;
+    criterion: string;
+    userQuestion: string;
+    response: string;
+  }> = [];
+
+  for (const cell of Object.values(state.cells)) {
+    if (cell.status !== "recorded") continue;
+    if (!cell.response) continue;
+    const task = taskById.get(cell.taskId);
+    if (!task) continue;
+    const already = cell.judgeResults?.length ?? 0;
+    for (let i = already; i < task.judge_criteria.length; i++) {
+      work.push({
+        cellId: cell.cellId,
+        criterionIndex: i,
+        criterion: task.judge_criteria[i],
+        userQuestion: task.user_turns ? task.user_turns.join(" → ") : task.user_prompt,
+        response: cell.response,
+      });
+    }
+  }
+
+  console.log(JSON.stringify({ runDir, pendingJudgeWork: work }, null, 2));
+}
+
+/** Record one judge verdict for one (cell, criterion-index) pair. */
+async function cmdRecordJudge(args: {
+  cell: CellId;
+  criterionIndex: number;
+  resultPath: string;
+}): Promise<void> {
+  const runDir = mustFindRun();
+  const state = await readState(runDir);
+  const cell = state.cells[args.cell];
+  if (!cell) {
+    console.error(`Unknown cell: ${args.cell}`);
+    process.exit(1);
+  }
+  const tasks = await loadTasks();
+  const task = tasks.find((t) => t.id === cell.taskId);
+  if (!task) {
+    console.error(`No task definition for ${cell.taskId}`);
+    process.exit(1);
+  }
+
+  const raw = await readFile(args.resultPath, "utf8");
+  const verdict = JSON.parse(raw) as {
+    verdict: "PASS" | "FAIL" | "PARTIAL";
+    reason: string;
+  };
+
+  cell.judgeResults ??= [];
+  cell.judgeResults[args.criterionIndex] = {
+    criterion: task.judge_criteria[args.criterionIndex],
+    verdict: verdict.verdict,
+    reason: verdict.reason,
+  };
+  await writeState(runDir, state);
+  console.log(
+    `Recorded judge verdict — ${args.cell}[${args.criterionIndex}]: ${verdict.verdict}`,
+  );
 }
 
 async function cmdReport(): Promise<void> {
@@ -433,9 +517,25 @@ async function main(): Promise<void> {
     case "calibrate":
       await cmdCalibrate();
       break;
+    case "judge-plan":
+      await cmdJudgePlan();
+      break;
+    case "record-judge":
+      if (!args.cell || args["criterion-index"] === undefined || !args._positional) {
+        console.error(
+          "Usage: cli.ts record-judge --cell <cellId> --criterion-index <N> <verdict.json>",
+        );
+        process.exit(1);
+      }
+      await cmdRecordJudge({
+        cell: args.cell as CellId,
+        criterionIndex: parseInt(args["criterion-index"] as string, 10),
+        resultPath: args._positional as string,
+      });
+      break;
     default:
       console.error(
-        "Commands: init | state | plan | record | grade | report | probe | calibrate",
+        "Commands: init | state | plan | record | grade | report | probe | calibrate | judge-plan | record-judge",
       );
       process.exit(1);
   }

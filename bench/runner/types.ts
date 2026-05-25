@@ -20,39 +20,13 @@ export type Category =
 
 export type Mcp = "dtc-mcp" | "klaviyo-mcp";
 
-export type ClaimType =
-  /** The final answer should mention this exact string (case-insensitive). */
-  | "contains-string"
-  /** The final answer should contain this number, within `tolerance` (default 0). */
-  | "contains-number"
-  /** The final answer's parsed list should have this many items. */
-  | "list-size"
-  /** Each item in the parsed list should have these keys. */
-  | "fields-present"
-  /** Items should appear in this order ("descending" / "ascending" by some implied key). */
-  | "ordering"
-  /** Fuzzy: a Sonnet judge sub-agent decides whether the claim holds. */
-  | "judge";
+/** Per-criterion verdict from the LLM-as-judge phase. */
+export type JudgeVerdict = "PASS" | "FAIL" | "PARTIAL";
 
-export interface Claim {
-  type: ClaimType;
-  /** Free-form expected value. Interpretation depends on `type`. */
-  expected: unknown;
-  /** Numeric tolerance — only used by `contains-number`. */
-  tolerance?: number;
-  /** Field name hint — only used by `ordering` to pin which field to sort
-   * by. Without this, the grader guesses the first orderable field, which
-   * can pick the wrong one when multiple fields look numeric or date-like. */
-  field?: string;
-  /** Human-readable description for the report. */
-  description?: string;
-}
-
-export interface TaskTurn {
-  /** Prompt text for this turn. */
-  prompt: string;
-  /** Optional claims specific to this turn's response. */
-  claims?: Claim[];
+export interface JudgeResult {
+  criterion: string;
+  verdict: JudgeVerdict;
+  reason: string;
 }
 
 export interface Task {
@@ -60,12 +34,14 @@ export interface Task {
   id: string;
   /** Task category — used for category-level aggregation in the report. */
   category: Category;
-  /** Headline prompt (single-turn tasks). For multi-turn, see `turns`. */
-  prompt: string;
-  /** Multi-turn tasks override `prompt` with an ordered list of turns. */
-  turns?: TaskTurn[];
-  /** Claims to verify on the final answer. */
-  claims: Claim[];
+  /** The exact prompt a real user would type. No format demands, no benchmark
+   * framing. Single-turn tasks use this; multi-turn ones use `user_turns`. */
+  user_prompt: string;
+  /** Multi-turn tasks: each entry is one user turn. Overrides user_prompt. */
+  user_turns?: string[];
+  /** Pass/fail criteria the LLM-as-judge evaluates against the sub-agent's
+   * free-form response. Each criterion is graded independently. */
+  judge_criteria: string[];
   /** Which MCPs this task targets. Default: both. */
   applies_to?: Mcp[];
   /** Free-form notes for humans. Not used by the runner. */
@@ -101,14 +77,11 @@ export interface ToolCall {
   outputBytes: number;
 }
 
-/** What the sub-agent returns when it finishes. */
-export interface SubAgentReport {
-  final_answer: string;
-  claims: string[];
-  /** Sub-agent's self-reported count. Ground truth comes from the trajectory. */
-  tool_calls: number;
-  succeeded: boolean;
-  errors?: string[];
+/** Real consumption stats parsed from the Agent tool's <usage> block. */
+export interface AgentUsage {
+  totalTokens: number;
+  toolUses: number;
+  durationMs: number;
 }
 
 export interface CellResult {
@@ -120,13 +93,19 @@ export interface CellResult {
   status: CellStatus;
   startedAt?: string;
   finishedAt?: string;
+  /** Free-form text the sub-agent returned to the natural user prompt. */
+  response?: string;
+  /** Real consumption from the sub-agent's <usage> block — the ground-truth
+   * token cost, distinct from `estimatedTokens` (the bench's byte-based
+   * estimator that only sees trajectory I/O). */
+  usage?: AgentUsage;
   trajectory?: Trajectory;
-  report?: SubAgentReport;
-  /** Token estimate (input + output + tool I/O), see estimator.ts. */
+  /** Bench's byte-based token estimate. Useful for trajectory-side comparisons
+   * but `usage.totalTokens` is the real number. */
   estimatedTokens?: number;
-  /** Grades after Phase 5 (recorded → graded). */
-  grades?: ClaimGrade[];
-  /** Aggregate score from grades (0–1). */
+  /** LLM-as-judge verdicts, one per task.judge_criteria entry. */
+  judgeResults?: JudgeResult[];
+  /** Aggregate 0–1 score: fraction of criteria with PASS (PARTIAL = 0.5). */
   score?: number;
   /** Reason if status === "failed" or "invalid". */
   error?: string;
@@ -139,13 +118,6 @@ export type CellStatus =
   | "graded"
   | "failed"
   | "invalid";
-
-export interface ClaimGrade {
-  claim: Claim;
-  passed: boolean;
-  /** Optional human-readable explanation from the grader. */
-  reason?: string;
-}
 
 // ─── State.json (the run's checkpoint) ─────────────────────────────────────
 
