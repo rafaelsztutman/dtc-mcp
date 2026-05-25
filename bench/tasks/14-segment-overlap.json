@@ -1,15 +1,13 @@
 {
   "id": "14-segment-overlap",
   "category": "cross-resource",
-  "user_prompt": "(multi-turn — see user_turns)",
-  "user_turns": [
-    "Pick 2 of my larger segments.",
-    "How many members are in each one right now?",
-    "Which of the two is bigger?"
-  ],
+  "user_prompt": "Give me a snapshot of my biggest audience segments. Find my top 5 by member count, and for each tell me when it was created and roughly how big it is relative to my total Klaviyo profile base (rough fraction is fine).",
+  "user_prompt_session_2": "I want to focus on my single largest segment. Tell me what it's called, how many people are in it, and whether you can find out anything about how active those members are (e.g. when most of them last engaged or subscribed).",
   "judge_criteria": [
-    "Two specific segments from the account are named.",
-    "Each segment has its current member count reported as a concrete number.",
-    "The answer states which segment is bigger, and the choice matches the numbers given."
-  ]
+    "The session-2 answer identifies a specific segment as the largest, with a name and member count.",
+    "The member count is a concrete number.",
+    "The answer attempts to characterize member activity (last engaged, subscription status, recency, etc.) — even if it has to caveat that detailed engagement data wasn't available.",
+    "The segment name is consistent with one from session 1's top-5 list (if cached state survived; otherwise a fresh re-derivation that lands on the same segment is fine)."
+  ],
+  "notes": "Session 1: top 5 segments + relative sizes. Session 2: drill into the single biggest, looking at engagement. dtc-mcp may carry the segment list + total-profile-count from globalThis; klaviyo-mcp re-fetches."
 }

@@ -39,8 +39,19 @@ export interface Task {
   user_prompt: string;
   /** Multi-turn tasks: each entry is one user turn. Overrides user_prompt. */
   user_turns?: string[];
+  /** Optional "session 2" prompt — a self-contained follow-up question a
+   * user might ask later in the same domain. Used to test whether dtc-mcp's
+   * stateful sandbox gives an edge when a fresh Agent is spawned but shares
+   * the parent's MCP connection (so the sandbox state from session 1 may
+   * still be live). klaviyo-mcp always starts cold; dtc-mcp may or may not,
+   * depending on connection sharing. Self-contained = the prompt makes
+   * sense on its own without relying on session-1 context. When present, the
+   * runner emits this as a second prompt; the cell records both sessions in
+   * `turns` and judges the session-2 response. */
+  user_prompt_session_2?: string;
   /** Pass/fail criteria the LLM-as-judge evaluates against the sub-agent's
-   * free-form response. Each criterion is graded independently. */
+   * free-form response. For tasks with session 2, judged against the
+   * session-2 response. */
   judge_criteria: string[];
   /** Which MCPs this task targets. Default: both. */
   applies_to?: Mcp[];
@@ -84,6 +95,15 @@ export interface AgentUsage {
   durationMs: number;
 }
 
+/** One turn of a multi-turn conversation with a single sub-agent. The
+ * first turn is spawned via the Agent tool; subsequent turns continue
+ * the same agent via SendMessage to its agentId. */
+export interface CellTurn {
+  prompt: string;
+  response: string;
+  usage: AgentUsage;
+}
+
 export interface CellResult {
   cellId: CellId;
   taskId: string;
@@ -93,12 +113,16 @@ export interface CellResult {
   status: CellStatus;
   startedAt?: string;
   finishedAt?: string;
-  /** Free-form text the sub-agent returned to the natural user prompt. */
+  /** Free-form text the sub-agent returned. For multi-turn cells, this is
+   * the FINAL turn's response (what the judge grades against). The per-turn
+   * breakdown lives in `turns`. */
   response?: string;
-  /** Real consumption from the sub-agent's <usage> block — the ground-truth
-   * token cost, distinct from `estimatedTokens` (the bench's byte-based
-   * estimator that only sees trajectory I/O). */
+  /** Aggregated consumption across all turns. For single-turn cells this
+   * equals the one turn's usage; for multi-turn it's the sum. The bench's
+   * `estimatedTokens` is a separate byte-based number. */
   usage?: AgentUsage;
+  /** Per-turn breakdown for multi-turn cells. Omitted on single-turn. */
+  turns?: CellTurn[];
   trajectory?: Trajectory;
   /** Bench's byte-based token estimate. Useful for trajectory-side comparisons
    * but `usage.totalTokens` is the real number. */

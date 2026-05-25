@@ -2,10 +2,14 @@
   "id": "15-strict-format-discipline",
   "category": "output-discipline",
   "user_prompt": "Give me just the names of my 3 most recently sent campaigns — nothing else, just the names.",
+  "user_prompt_session_2": "Of my 3 most recently sent campaigns, which one had the highest open rate? Just tell me the campaign name and its open rate — no other detail.",
   "judge_criteria": [
-    "The answer contains 3 specific campaign names from the account.",
-    "The answer is concise — it does NOT include extra commentary, explanations, IDs, dates, or surrounding prose. Just the names.",
-    "The 3 names are the most-recently-sent campaigns (newest first or as a list of recent).",
-    "Names are real campaigns from the account, not invented examples."
-  ]
+    "The session-2 answer names a single specific campaign as having the highest open rate.",
+    "The open rate is reported as a concrete number or percentage.",
+    "The open rate is plausible (between 0% and 100%, or 0–1 if a fraction).",
+    "The answer is concise — campaign name + open rate only, no surrounding analysis or extra campaigns.",
+    "The campaign named is one of the 3 most-recently-sent (consistent with what session 1 would have surfaced)."
+  ],
+  "reportingHeavy": true,
+  "notes": "Session 1: terse list of 3 campaign names (output-discipline test). Session 2: drill into which of those 3 had the highest open rate. dtc-mcp may keep the 3 campaign IDs cached; klaviyo-mcp re-fetches. Tests output discipline in both sessions."
 }

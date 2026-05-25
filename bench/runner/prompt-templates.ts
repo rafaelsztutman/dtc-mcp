@@ -24,7 +24,10 @@ export function prefixFor(mcp: Mcp, metadata: McpMetadata): string {
 }
 
 export interface SubAgentPrompt {
-  prompt: string;
+  /** Per-turn prompt strings, always length ≥ 1. The first turn is spawned
+   * via the Agent tool; subsequent turns continue the same agent via
+   * SendMessage. Single-turn tasks have a length-1 array. */
+  prompts: string[];
   description: string;
 }
 
@@ -35,19 +38,39 @@ export function buildSubAgentPrompt(
   metadata: McpMetadata,
 ): SubAgentPrompt {
   const prefix = prefixFor(mcp, metadata);
-
-  const userContent = task.user_turns
-    ? task.user_turns.map((t, i) => `Turn ${i + 1}: ${t}`).join("\n\n")
-    : task.user_prompt;
-
   // The routing hint is the only benchmark-related text. Kept short and
   // framed as a tool preference, not a constraint, so it reads naturally.
-  const prompt = `Use the \`${prefix}*\` MCP tools to answer this question. Respond as you naturally would.
+  const preamble = `Use the \`${prefix}*\` MCP tools to answer this question. Respond as you naturally would.`;
 
-${userContent}`;
+  // Determine the turn structure. Three cases:
+  //   1. Multi-turn within one session (user_turns): preamble on turn 1
+  //      only; turns 2+ are bare follow-ups. NOTE: with the current
+  //      orchestrator we don't have SendMessage, so this path is effectively
+  //      unused — kept for future support.
+  //   2. Session 1 + session 2 (user_prompt + user_prompt_session_2): both
+  //      prompts get the preamble because each is spawned as a FRESH agent
+  //      that doesn't know what came before. The "shared state" we're
+  //      testing comes from the MCP server side (dtc-mcp's sandbox), not
+  //      the agent side.
+  //   3. Plain single-turn: just one prompt with preamble.
+  const turns = task.user_turns
+    ? task.user_turns
+    : task.user_prompt_session_2
+      ? [task.user_prompt, task.user_prompt_session_2]
+      : [task.user_prompt];
+
+  const prompts = turns.map((t, i) => {
+    if (task.user_turns) {
+      // Multi-turn continuation: preamble on turn 1 only.
+      return i === 0 ? `${preamble}\n\n${t}` : t;
+    }
+    // Multi-session: every prompt is a fresh agent, every prompt gets the
+    // preamble. Single-turn falls through the same way (one prompt).
+    return `${preamble}\n\n${t}`;
+  });
 
   return {
-    prompt,
+    prompts,
     description: `Bench: ${task.id} on ${mcp} (trial ${trial})`,
   };
 }
@@ -59,11 +82,16 @@ ${userContent}`;
  *   - criterion appears first, response second, with explicit ternary verdict
  *   - PARTIAL exists so the judge doesn't have to force-fit ambiguous cases
  */
+export interface JudgePrompt {
+  prompt: string;
+  description: string;
+}
+
 export function buildJudgePrompt(
   userQuestion: string,
   response: string,
   criterion: string,
-): SubAgentPrompt {
+): JudgePrompt {
   const prompt = `
 You are an impartial grader evaluating whether a model's free-form answer to a
 user's question satisfies a specific success criterion.

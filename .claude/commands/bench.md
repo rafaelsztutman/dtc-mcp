@@ -48,7 +48,8 @@ is no per-cell grading during a batch run.
 
 4. **Run `tsx bench/runner/cli.ts plan --batch <batch> [--limit N]`** to
    get the JSON plan. Parse it — it's an array of pending cells, each
-   with a fully-built natural-prompt for the sub-agent.
+   with a `prompts: string[]` array (length 1 for single-turn tasks,
+   length ≥ 2 for multi-turn tasks).
 
 5. **For each cell in the plan — STRICTLY SEQUENTIAL**, one at a time.
    Klaviyo's API will flag bursty access; the harness intentionally paces
@@ -63,52 +64,74 @@ is no per-cell grading during a batch run.
       extra 10s buffer to be safe — Klaviyo's per-account rate limiter
       doesn't care which MCP made the calls.
    b. Capture `startedAt = new Date().toISOString()`.
-   c. Spawn a sub-agent via the `Agent` tool. Use `subagent_type: claude`,
-      `description` from the plan, `prompt` from the plan. The sub-agent
-      will run autonomously and return its free-form answer as its message.
-   d. Capture `finishedAt`.
-   e. **The sub-agent's response is free-form text** — there is no JSON
-      contract to validate. Capture the entire returned message body as
-      the `response` field.
-   f. **Parse the `<usage>` footer** appended to the Agent tool result.
-      It looks like:
+   c. **Spawn the sub-agent for turn 1** via the `Agent` tool. Use
+      `subagent_type: claude`, `description` from the plan, and
+      `prompt: prompts[0]` (the first entry of the prompts array). The
+      result will include an `agentId` line you can use to continue the
+      conversation. Capture: the response body (as `response`), the
+      `<usage>` block (as `usage`), and the `agentId`.
+   d. **For `prompts[1..N]` (multi-turn cells only):** for each remaining
+      prompt, send it as a follow-up to the SAME agent via `SendMessage`
+      with `to: <agentId>` and `prompt: prompts[i]`. Capture each turn's
+      response + usage block individually. Use the agent's stateful
+      context — DO NOT spawn a fresh Agent per turn (that would break
+      the multi-turn signal we're trying to measure).
+   e. Capture `finishedAt`.
+   f. **Per-turn extraction.** Each Agent or SendMessage response has
+      a free-form text body plus a `<usage>` footer like:
       ```
       <usage>total_tokens: 25027
       tool_uses: 3
       duration_ms: 34064</usage>
       ```
-      Extract `total_tokens`, `tool_uses`, and `duration_ms`.
+      Extract `total_tokens`, `tool_uses`, and `duration_ms` for that
+      turn. The `response` for the cell as a whole is the FINAL turn's
+      response (this is what the judge grades). The `usage` for the
+      cell is the SUM of every turn's tokens/tool_uses/duration_ms.
    g. **Optionally capture a trajectory.** The Agent tool doesn't expose
       per-tool input/output, but you usually know which tool names were
       used from the agent's reasoning. Provide a `toolCalls` array with
       `{name, input: {}, output: {}, inputBytes: 0, outputBytes: 0}` for
-      each call — the CLI uses this only for the MCP-prefix constraint
-      check, so even stub entries with just `name` are useful. Skipping
-      the trajectory entirely is allowed; you lose the constraint check
-      but the response + usage still record.
+      each call (aggregated across turns) — the CLI uses this only for
+      the MCP-prefix constraint check, so even stub entries with just
+      `name` are useful. Skipping the trajectory entirely is allowed;
+      you lose the constraint check but the response + usage still record.
    h. Write the result to `bench/results/<runId>/tmp/<cellId>.json` with
       this schema:
       ```json
       {
-        "response": "<free-form text the sub-agent returned>",
+        "response": "<final-turn free-form text>",
         "usage": {
-          "totalTokens": 25027,
-          "toolUses": 3,
-          "durationMs": 34064
+          "totalTokens": 75000,
+          "toolUses": 8,
+          "durationMs": 110000
         },
+        "turns": [
+          { "prompt": "Turn 1 question…",
+            "response": "Turn 1 answer…",
+            "usage": { "totalTokens": 25000, "toolUses": 3, "durationMs": 35000 } },
+          { "prompt": "Turn 2 question…",
+            "response": "Turn 2 answer…",
+            "usage": { "totalTokens": 24000, "toolUses": 2, "durationMs": 33000 } },
+          { "prompt": "Turn 3 question…",
+            "response": "<copy of cell.response>",
+            "usage": { "totalTokens": 26000, "toolUses": 3, "durationMs": 42000 } }
+        ],
         "trajectory": {
           "toolCalls": [
             { "name": "mcp__dtc-mcp__execute_code",
               "input": {}, "output": {},
               "inputBytes": 0, "outputBytes": 0 }
           ],
-          "rawResponse": "<copy of response — kept for raw.jsonl>",
-          "durationMs": 34064
+          "rawResponse": "(see response field)",
+          "durationMs": 110000
         },
         "startedAt": "...",
         "finishedAt": "..."
       }
       ```
+      `turns` is OMITTED for single-turn cells (length-1 prompts arrays);
+      `response`/`usage` carry the single turn's data alone.
       Filename: use `__` (double underscore) instead of `::` in cell IDs
       since `::` is awkward in shell paths. e.g.
       `01-list-recent-campaigns__dtc-mcp__trial-1.json`.

@@ -167,7 +167,10 @@ async function cmdPlan(args: { batch: Batch; limit?: number }): Promise<void> {
       delayBeforeMs: delay,
       reportingHeavy: !!task.reportingHeavy,
       description: subAgent.description,
-      prompt: subAgent.prompt,
+      /** Array of per-turn prompts. Single-turn cells have length 1. The
+       * orchestrator spawns Agent with prompts[0], then SendMessage to the
+       * returned agentId with prompts[1..]. */
+      prompts: subAgent.prompts,
     };
   });
 
@@ -204,10 +207,21 @@ async function cmdRecord(args: {
 
   const raw = await readFile(args.resultPath, "utf8");
   const submission = JSON.parse(raw) as {
-    /** Free-form text the sub-agent returned. */
+    /** For single-turn cells: the sub-agent's free-form text. For
+     * multi-turn cells: the FINAL turn's response (what the judge grades
+     * against). Per-turn breakdown lives in `turns`. */
     response: string;
-    /** Real consumption parsed from the Agent tool's <usage> block. */
+    /** Aggregated consumption across all turns. For single-turn this is
+     * just the one turn's usage; for multi-turn it's the sum. */
     usage: { totalTokens: number; toolUses: number; durationMs: number };
+    /** Optional per-turn breakdown. If present, length must match the
+     * number of turns the task defines. Each entry has `prompt`,
+     * `response`, and `usage` for that turn. */
+    turns?: Array<{
+      prompt: string;
+      response: string;
+      usage: { totalTokens: number; toolUses: number; durationMs: number };
+    }>;
     /** Optional trajectory for constraint check + bench's byte-based estimator.
      * Pass `{ toolCalls: [{name: "mcp__x__..."}, ...], rawResponse, durationMs }`
      * with whatever tool names we can see in the Agent transcript. Empty/missing
@@ -242,6 +256,7 @@ async function cmdRecord(args: {
   await recordCell(runDir, args.cell, {
     response: submission.response,
     usage: submission.usage,
+    turns: submission.turns,
     trajectory: submission.trajectory,
     estimatedTokens,
     status: isInvalid ? "invalid" : "recorded",
@@ -252,8 +267,9 @@ async function cmdRecord(args: {
     finishedAt: submission.finishedAt,
   });
 
+  const turnsNote = submission.turns ? `, turns: ${submission.turns.length}` : "";
   console.log(
-    `Recorded ${args.cell} — status: ${isInvalid ? "invalid" : "recorded"}, real tokens: ${submission.usage.totalTokens}, duration: ${submission.usage.durationMs}ms${estimatedTokens !== undefined ? `, est: ${estimatedTokens}` : ""}`,
+    `Recorded ${args.cell} — status: ${isInvalid ? "invalid" : "recorded"}, real tokens: ${submission.usage.totalTokens}, duration: ${submission.usage.durationMs}ms${estimatedTokens !== undefined ? `, est: ${estimatedTokens}` : ""}${turnsNote}`,
   );
   if (isInvalid) {
     console.log(`  Violations: ${violations.join(", ")}`);

@@ -1,17 +1,14 @@
 {
   "id": "12-campaign-deep-dive",
   "category": "cross-resource",
-  "user_prompt": "(multi-turn — see user_turns)",
-  "user_turns": [
-    "What's the most recent email campaign I sent?",
-    "How did it perform — open rate and click rate?",
-    "Summarize the key details in one short paragraph."
-  ],
+  "user_prompt": "I want to understand how my last sent email campaign performed. Find the most recent one I sent, pull its open rate, click rate, and any conversion data you can get for it, then give me a 2-3 sentence summary of how it did. Call out anything that stands out — good or bad.",
   "judge_criteria": [
-    "The final summary names a specific real campaign from the account (with name or send date).",
-    "The summary includes both open rate and click rate as concrete numbers.",
-    "The open and click rates are plausible values (between 0% and 100%, or 0–1 if fractions).",
-    "The summary reads as a one-paragraph plain-English answer, not a JSON dump or bullet list."
+    "The answer identifies a specific real campaign from the account (by name or send date).",
+    "Open rate and click rate are both reported as concrete numbers.",
+    "A conversion-related metric (revenue, orders, conversion rate) is reported, OR the answer explicitly notes it was unavailable and why.",
+    "The answer includes a brief plain-English summary or judgment about the campaign's performance — not just a data dump.",
+    "Reported rates are plausible (between 0% and 100%, or 0–1 if fractions)."
   ],
-  "reportingHeavy": true
+  "reportingHeavy": true,
+  "notes": "Ambitious single-session analysis. Tests campaign discovery → reporting endpoint → light analytical summarization in one pass."
 }
