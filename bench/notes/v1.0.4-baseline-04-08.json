@@ -1,0 +1,299 @@
+{
+  "runId": "2026-05-25T13-57-02-773Z",
+  "version": "1.0.4",
+  "capturedAt": "2026-05-25T22:23:56.824Z",
+  "cells": {
+    "04-short-welcome-flow-deep-dive::dtc-mcp::trial-1": {
+      "tokens": 49421,
+      "durationMs": 95253,
+      "toolUses": 11,
+      "score": 1,
+      "judgeResults": [
+        {
+          "criterion": "The final answer reports the welcome flow's open rate as a concrete number or percentage.",
+          "verdict": "PASS",
+          "reason": "The answer clearly reports the welcome flow's open rate as 32.4%, a concrete percentage."
+        },
+        {
+          "criterion": "The final answer reports the average open rate across live flows as a concrete number or percentage.",
+          "verdict": "PASS",
+          "reason": "The answer reports two concrete average open rate numbers: a recipient-weighted average of 37.4% and a simple mean of 41.8% across live email flows."
+        },
+        {
+          "criterion": "A direct comparison is made — either as a difference, ratio, or a clear 'above/below average' verdict.",
+          "verdict": "PASS",
+          "reason": "The answer provides both a volume-weighted difference (−5.0 pts below) and a simple mean difference (−9.4 pts below), giving a clear 'below average' verdict with explicit numerical comparisons."
+        },
+        {
+          "criterion": "Both rates are within a plausible range (0–100% or 0–1 as a fraction).",
+          "verdict": "PASS",
+          "reason": "Both the welcome flow open rate (32.4%) and the average across live flows (37.4% weighted, 41.8% simple mean) are within the valid 0–100% range."
+        },
+        {
+          "criterion": "The comparison uses the same 30-day window for both sides — not a window mismatch.",
+          "verdict": "PASS",
+          "reason": "The answer explicitly states 'same 30d window' for both the welcome flow metrics and the comparison across live email flows."
+        }
+      ],
+      "responseChars": 1116
+    },
+    "04-short-welcome-flow-deep-dive::dtc-mcp::trial-2": {
+      "tokens": 59800,
+      "durationMs": 148666,
+      "toolUses": 20,
+      "score": 1,
+      "judgeResults": [
+        {
+          "criterion": "The final answer reports the welcome flow's open rate as a concrete number or percentage.",
+          "verdict": "PASS",
+          "reason": "The answer explicitly states the welcome flow's open rate as 32.5% with 1,842 unique opens over the last 30 days."
+        },
+        {
+          "criterion": "The final answer reports the average open rate across live flows as a concrete number or percentage.",
+          "verdict": "PASS",
+          "reason": "The answer reports two concrete average open rate figures across live flows: a recipient-weighted average of 33.6% and a simple per-flow mean of 25.6%."
+        },
+        {
+          "criterion": "A direct comparison is made — either as a difference, ratio, or a clear 'above/below average' verdict.",
+          "verdict": "PASS",
+          "reason": "The answer provides two direct comparisons with explicit numerical differences (1.1 pp below weighted average, 6.9 pp above simple mean) and clear above/below verdicts."
+        },
+        {
+          "criterion": "Both rates are within a plausible range (0–100% or 0–1 as a fraction).",
+          "verdict": "PASS",
+          "reason": "All rates reported are within 0–100%: welcome flow open rate 32.5%, weighted average 33.6%, and simple mean 25.6% are all plausible percentages."
+        },
+        {
+          "criterion": "The comparison uses the same 30-day window for both sides — not a window mismatch.",
+          "verdict": "PASS",
+          "reason": "Both the welcome flow metrics and the all-live-flows comparison explicitly use the same 'last 30 days' window throughout the answer."
+        }
+      ],
+      "responseChars": 1333
+    },
+    "04-short-welcome-flow-deep-dive::klaviyo-mcp::trial-1": {
+      "tokens": 57263,
+      "durationMs": 76828,
+      "toolUses": 10,
+      "score": 1,
+      "judgeResults": [
+        {
+          "criterion": "The final answer reports the welcome flow's open rate as a concrete number or percentage.",
+          "verdict": "PASS",
+          "reason": "The answer clearly reports the welcome flow's open rate as 32.4%."
+        },
+        {
+          "criterion": "The final answer reports the average open rate across live flows as a concrete number or percentage.",
+          "verdict": "PASS",
+          "reason": "The answer reports two concrete average open rate percentages: 37.4% blended average across all live email flows and 43.3% for all other live email flows excluding the welcome flow."
+        },
+        {
+          "criterion": "A direct comparison is made — either as a difference, ratio, or a clear 'above/below average' verdict.",
+          "verdict": "PASS",
+          "reason": "The answer provides a direct comparison with exact numbers showing the welcome flow is ~11 points below other live email flows and ~5 points below the blended average, giving a clear 'below average' verdict with specific differences."
+        },
+        {
+          "criterion": "Both rates are within a plausible range (0–100% or 0–1 as a fraction).",
+          "verdict": "PASS",
+          "reason": "All open rates reported (32.4%, 37.4%, 43.3%, 44.6%, 3.5%, 50–80%) are within the valid 0–100% range."
+        },
+        {
+          "criterion": "The comparison uses the same 30-day window for both sides — not a window mismatch.",
+          "verdict": "PASS",
+          "reason": "The answer explicitly states 'last 30 days' for both the welcome flow performance and the comparison across all live flows, using the same time window throughout."
+        }
+      ],
+      "responseChars": 1528
+    },
+    "04-short-welcome-flow-deep-dive::klaviyo-mcp::trial-2": {
+      "tokens": 59490,
+      "durationMs": 85622,
+      "toolUses": 10,
+      "score": 1,
+      "judgeResults": [
+        {
+          "criterion": "The final answer reports the welcome flow's open rate as a concrete number or percentage.",
+          "verdict": "PASS",
+          "reason": "The answer explicitly reports the welcome flow's open rate as 32.4%."
+        },
+        {
+          "criterion": "The final answer reports the average open rate across live flows as a concrete number or percentage.",
+          "verdict": "PASS",
+          "reason": "The answer explicitly states the weighted-average open rate across all live email flows as ~37.4%, which is a concrete percentage."
+        },
+        {
+          "criterion": "A direct comparison is made — either as a difference, ratio, or a clear 'above/below average' verdict.",
+          "verdict": "PASS",
+          "reason": "The answer provides a direct comparison with both the welcome flow's open rate (32.4%) and the all-flows average (37.4%), explicitly stating the welcome flow is '~5 pts below' the account-wide average."
+        },
+        {
+          "criterion": "Both rates are within a plausible range (0–100% or 0–1 as a fraction).",
+          "verdict": "PASS",
+          "reason": "Both reported rates (32.4% welcome flow open rate and ~37.4% all-flows average) are within the valid 0–100% range."
+        },
+        {
+          "criterion": "The comparison uses the same 30-day window for both sides — not a window mismatch.",
+          "verdict": "PASS",
+          "reason": "Both the welcome flow metrics and the all-live-flows comparison explicitly use the same 'last 30 days' window."
+        }
+      ],
+      "responseChars": 1602
+    },
+    "08-long-full-analytics-conversation::dtc-mcp::trial-1": {
+      "tokens": 129108,
+      "durationMs": 438849,
+      "toolUses": 54,
+      "score": 0.9166666666666666,
+      "judgeResults": [
+        {
+          "criterion": "The final 3 bullets reference the specific top campaign and top flow identified in earlier turns — not new entities.",
+          "verdict": "PASS",
+          "reason": "The final 3 bullets explicitly reference 'Welcome Flow 15% off' ($3.3K) as the top flow and 'Birthday SALE' with subject 'Up to 55% OFF, celebrate with us! 🎉' ($2.0K) as the top campaign — the same entities identified in the earlier turns."
+        },
+        {
+          "criterion": "The 'revenue winners' bullet correctly identifies whether the top flow or top campaign was bigger (consistent with turn 7's comparison).",
+          "verdict": "PASS",
+          "reason": "The CEO bullet correctly states the top flow ($3.3K) was bigger than the top campaign ($2.0K) at 1.65×, consistent with turn 7's comparison of $3,326 vs $2,019."
+        },
+        {
+          "criterion": "The audience/segment overlap insight references one of the 3 segments named in turn 8.",
+          "verdict": "PASS",
+          "reason": "The overlap section explicitly references all three named segments: 'R/ Entire List', 'EM | Non-customers', and the unengaged segment, discussing each in relation to the welcome flow's audience."
+        },
+        {
+          "criterion": "The health snapshot bullet includes the campaign-count, flow-count, and profile-count numbers from turn 1.",
+          "verdict": "PARTIAL",
+          "reason": "The health snapshot bullet includes campaign-count (12) and flow-count (14 live flows) but explicitly omits a profile-count number, substituting '~30 active segments' as a proxy instead."
+        },
+        {
+          "criterion": "No metric, campaign, flow, or segment is fabricated in the final bullets — every claim traces to an earlier turn.",
+          "verdict": "PASS",
+          "reason": "Every metric in the CEO bullets — $3.3K flow revenue, $2.0K campaign revenue, 12 campaigns, 14 flows, $8.7K/$9.2K totals, $240 worst campaign, ~$0.06/recipient, and the segment overlap claims — directly traces to figures and observations stated in the numbered sections earlier in the same response."
+        },
+        {
+          "criterion": "The final output is genuinely 3 bullets in a CEO-ready format (not a long prose dump or a rehash of every turn).",
+          "verdict": "PASS",
+          "reason": "The answer ends with exactly 3 clearly labeled bullet points under a '📋 CEO update (paste-ready)' heading covering the health snapshot, revenue winners, and audience insight — concise and paste-ready."
+        }
+      ],
+      "responseChars": 4817
+    },
+    "08-long-full-analytics-conversation::dtc-mcp::trial-2": {
+      "tokens": 92513,
+      "durationMs": 286750,
+      "toolUses": 35,
+      "score": 1,
+      "judgeResults": [
+        {
+          "criterion": "The final 3 bullets reference the specific top campaign and top flow identified in earlier turns — not new entities.",
+          "verdict": "PASS",
+          "reason": "The 3 bullets explicitly reference the Welcome Flow ($3.3K) and Birthday SALE campaign ($2.0K) with their exact subject lines, which are the same top flow and top campaign identified in earlier turns."
+        },
+        {
+          "criterion": "The 'revenue winners' bullet correctly identifies whether the top flow or top campaign was bigger (consistent with turn 7's comparison).",
+          "verdict": "PASS",
+          "reason": "The revenue winners bullet correctly identifies the Welcome Flow ($3.3K) as bigger than the top campaign ($2.0K), consistent with the turn 7 comparison showing $3,325.63 vs $2,019.37."
+        },
+        {
+          "criterion": "The audience/segment overlap insight references one of the 3 segments named in turn 8.",
+          "verdict": "PASS",
+          "reason": "The audience overlap insight explicitly references all three named segments ('R/ Entire List', 'EM | Non-customers', and 'R / Active Subscription Purchasers') from turn 8, discussing each one's overlap with the top-revenue flow."
+        },
+        {
+          "criterion": "The health snapshot bullet includes the campaign-count, flow-count, and profile-count numbers from turn 1.",
+          "verdict": "PASS",
+          "reason": "The health snapshot bullet explicitly includes all three numbers: 12 campaigns sent, 14 live flows, and ~10.3K active profiles."
+        },
+        {
+          "criterion": "No metric, campaign, flow, or segment is fabricated in the final bullets — every claim traces to an earlier turn.",
+          "verdict": "PASS",
+          "reason": "Every figure, name, and claim in the three CEO-update bullets (campaign count, flow count, profile count, revenue amounts, subject lines, flow trigger, segment sizes, overlap characterization) is explicitly stated in the structured analysis sections earlier in the same response, with no new or inconsistent values introduced in the summary."
+        },
+        {
+          "criterion": "The final output is genuinely 3 bullets in a CEO-ready format (not a long prose dump or a rehash of every turn).",
+          "verdict": "PASS",
+          "reason": "The answer ends with exactly 3 concise, CEO-ready bullet points covering health snapshot, revenue winners, and audience/segment overlap insight."
+        }
+      ],
+      "responseChars": 3096
+    },
+    "08-long-full-analytics-conversation::klaviyo-mcp::trial-1": {
+      "tokens": 100363,
+      "durationMs": 147290,
+      "toolUses": 26,
+      "score": 1,
+      "judgeResults": [
+        {
+          "criterion": "The final 3 bullets reference the specific top campaign and top flow identified in earlier turns — not new entities.",
+          "verdict": "PASS",
+          "reason": "The 3 bullets explicitly reference 'Birthday SALE May 19' as the top campaign and 'Welcome Flow' as the top flow, which are the same entities identified in the earlier turns of the analysis."
+        },
+        {
+          "criterion": "The 'revenue winners' bullet correctly identifies whether the top flow or top campaign was bigger (consistent with turn 7's comparison).",
+          "verdict": "PASS",
+          "reason": "The CEO bullet correctly identifies the Welcome Flow ($3,326) as bigger than the top campaign ($2,019), consistent with the turn 7 comparison showing the flow beat the campaign by ~65%."
+        },
+        {
+          "criterion": "The audience/segment overlap insight references one of the 3 segments named in turn 8.",
+          "verdict": "PASS",
+          "reason": "The overlap insight explicitly references all three segments named in turn 8: 'R/ Entire List', 'EM | Non-customers', and 'EM | Engaged 90D (not subscribers)', discussing each one's overlap with the Welcome Flow audience."
+        },
+        {
+          "criterion": "The health snapshot bullet includes the campaign-count, flow-count, and profile-count numbers from turn 1.",
+          "verdict": "PASS",
+          "reason": "The CEO health snapshot bullet explicitly includes all three numbers: ~10.3K active profiles, 10 campaigns sent, and 14 live flows."
+        },
+        {
+          "criterion": "No metric, campaign, flow, or segment is fabricated in the final bullets — every claim traces to an earlier turn.",
+          "verdict": "PASS",
+          "reason": "Every metric, campaign name, flow name, segment name, and revenue figure in the three CEO bullets directly traces to data presented in the earlier analysis sections of the same answer, with no fabricated or unsubstantiated claims."
+        },
+        {
+          "criterion": "The final output is genuinely 3 bullets in a CEO-ready format (not a long prose dump or a rehash of every turn).",
+          "verdict": "PASS",
+          "reason": "The answer ends with exactly 3 concise, CEO-ready bullet points covering the health snapshot, revenue winners, and audience/segment overlap insight as requested."
+        }
+      ],
+      "responseChars": 4064
+    },
+    "08-long-full-analytics-conversation::klaviyo-mcp::trial-2": {
+      "tokens": 105416,
+      "durationMs": 142250,
+      "toolUses": 25,
+      "score": 1,
+      "judgeResults": [
+        {
+          "criterion": "The final 3 bullets reference the specific top campaign and top flow identified in earlier turns — not new entities.",
+          "verdict": "PASS",
+          "reason": "The final 3 bullets explicitly reference the Birthday Sale (top campaign) and Welcome Flow (top flow) identified in earlier turns, with matching revenue figures and subject lines."
+        },
+        {
+          "criterion": "The 'revenue winners' bullet correctly identifies whether the top flow or top campaign was bigger (consistent with turn 7's comparison).",
+          "verdict": "PASS",
+          "reason": "The revenue winners bullet correctly identifies the Welcome Flow ($3,326) as bigger than the top campaign Birthday Sale ($2,019), consistent with turn 7's comparison showing ~65% larger."
+        },
+        {
+          "criterion": "The audience/segment overlap insight references one of the 3 segments named in turn 8.",
+          "verdict": "PASS",
+          "reason": "The audience/segment overlap insight explicitly references all three named segments — 'EM | Non-customers,' 'R/ Entire List,' and 'R/ Buyers' — and discusses their overlap with the top-revenue Welcome Flow."
+        },
+        {
+          "criterion": "The health snapshot bullet includes the campaign-count, flow-count, and profile-count numbers from turn 1.",
+          "verdict": "PASS",
+          "reason": "The CEO update health snapshot bullet includes all three numbers: ~10.3K marketable subscribers (profile count), 10 email campaigns (campaign count), and 14 live flows (flow count)."
+        },
+        {
+          "criterion": "No metric, campaign, flow, or segment is fabricated in the final bullets — every claim traces to an earlier turn.",
+          "verdict": "PASS",
+          "reason": "Every metric, campaign name, flow name, revenue figure, subject line, segment name, and profile count cited in the final CEO bullets is explicitly established in the detailed analysis sections earlier in the same answer, with no new fabricated claims introduced in the bullets."
+        },
+        {
+          "criterion": "The final output is genuinely 3 bullets in a CEO-ready format (not a long prose dump or a rehash of every turn).",
+          "verdict": "PASS",
+          "reason": "The answer ends with exactly 3 concise, paste-ready bullet points covering the health snapshot, revenue winners, and audience/segment overlap insight in a CEO-appropriate format."
+        }
+      ],
+      "responseChars": 3520
+    }
+  }
+}

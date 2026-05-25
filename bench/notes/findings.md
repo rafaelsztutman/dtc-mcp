@@ -128,6 +128,34 @@ Things that look like fixes but would over-tune dtc-mcp for the bench and bake i
 
 ---
 
+## v1.0.5 status (added 2026-05-25 post-publish)
+
+**Shipped.** v1.0.5 published to npm on 2026-05-25, addresses backlog item #1 (stash-and-cite ergonomics).
+
+Specific changes — see commit `e3f3551`:
+
+- New `globals()` helper in the sandbox returns `{ name: summary }` for everything stashed on `globalThis` (filters out built-ins via a baseline captured at module-load in an IIFE closure).
+- `execute_code` tool description strengthened: explicit STRONGLY RECOMMENDED paragraph on stashing expensive fetches, concrete cost framing ("re-fetching a 5k-row report costs ~30k tokens; reading globalThis costs nearly nothing"), `globals()` listed in the available-globals enumeration.
+- `guide.stateful-sessions` doc chunk gets a new "Discovering what's stashed: use globals()" section so search hits surface the introspection pattern alongside the basics.
+- 3 new tests in `tests/output-discipline.test.ts`, all 62 pass.
+
+**Re-bench scope.** 8 cells from tasks 04 + 08 (the two tasks where v1.0.4 dtc lost or held the same on tokens despite the conversation favoring sandbox state). Tasks 03 + 07 are deliberately excluded — they're segment-discovery-bound, a separate v1.1.0 fix; a v1.0.5 re-run wouldn't isolate the stash-and-cite delta cleanly.
+
+**v1.0.4 baseline preserved** at `bench/notes/v1.0.4-baseline-04-08.json` so we can compare directly. The 8 cells in the live `state.json` are reset to pending; re-run + re-judge after Claude Max quota refreshes.
+
+**What we expect to see if v1.0.5 worked:**
+- Task 08 dtc tokens: from 110,811 mean → some reduction (target: parity or better with klv's 102,890). Mechanism: agent stashes account-health snapshot in turn 1, references it across the segment-overlap and revenue-comparison turns instead of re-querying.
+- Task 04 dtc trial variance: from (49k, 60k) → tighter. Mechanism: stash the welcome-flow report in turn 1, reuse for the comparison in turn 2 instead of recomputing.
+- klv numbers: should be ~unchanged. v1.0.5 only affects dtc-mcp's tool description and sandbox helpers.
+
+**What would falsify the v1.0.5 fix:**
+- Dtc tokens stay flat or rise. Means the description nudge wasn't enough; need stronger interventions (response-side hints, agent-side fine-tuning prompts in the bench preamble, etc.).
+- Tool-call counts stay flat. Means agent isn't reaching for `globals()`; the helper isn't being discovered even with the description mention.
+
+**v1.1.0 plan drafted at `v1.1.0-plan.md`** — recipe-by-intent discovery (bundles backlog #3 + #5). Move to that after v1.0.5 delta is in hand and we know how much of the remaining gap is attributable to discovery vs other factors.
+
+---
+
 ## Open questions for planning
 
 1. **#1 (stash guidance) is cheap and high-leverage** — should we ship it as v1.0.5 by itself to validate the lift before tackling the rest?
