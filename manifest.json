@@ -2,7 +2,7 @@
   "manifest_version": "0.3",
   "name": "dtc-mcp",
   "display_name": "DTC E-Commerce Analytics",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "Code-execution MCP for Klaviyo + Shopify analytics. Three tools (execute_code, search_docs, read_doc) backed by typed SDKs in a stateful V8 sandbox.",
   "author": {
     "name": "Rafael Sztutman"

@@ -141,6 +141,9 @@ export async function klaviyoGet(
  * don't waste a roundtrip + retry. Rules:
  *   - `pageSize` → `page[size]`, `pageCursor` → `page[cursor]`
  *   - `fields: { campaign: ['name','status'] }` → `'fields[campaign]': 'name,status'`
+ *   - `sort: '-send_time'` → `sort: '-scheduled_at'` (send_time is a response
+ *     field but not a valid sort key on /campaigns — silent rewrite spares
+ *     a wasted API call + retry. See KLAVIYO_SORT_ALIASES.)
  *   - Any value that's not a string is coerced via String() (booleans/numbers
  *     are valid query values; arrays become comma-joined strings)
  * Already-canonical bracket keys pass through unchanged.
@@ -169,7 +172,11 @@ export function normalizeKlaviyoParams(
 
     const alias = KLAVIYO_PARAM_ALIASES[key];
     const canonicalKey = alias ?? key;
-    out[canonicalKey] = Array.isArray(raw) ? (raw as unknown[]).join(",") : String(raw);
+    let value = Array.isArray(raw) ? (raw as unknown[]).join(",") : String(raw);
+    if (canonicalKey === "sort") {
+      value = KLAVIYO_SORT_ALIASES[value] ?? value;
+    }
+    out[canonicalKey] = value;
   }
   return out;
 }
@@ -178,6 +185,17 @@ const KLAVIYO_PARAM_ALIASES: Record<string, string> = {
   pageSize: "page[size]",
   pageCursor: "page[cursor]",
   pageCount: "page[count]",
+};
+
+/** Sort-value aliases. The LLM reflexively reaches for response-field names
+ * (`send_time`, `open_time`, etc.) when sorting, but Klaviyo's API only
+ * accepts a narrow allowlist. We silently rewrite the common misreaches to
+ * their semantically-equivalent valid sort keys. Both `send_time` and
+ * `scheduled_at` order sent campaigns identically in practice, so the
+ * rewrite is loss-free for the typical "most recent campaigns" use case. */
+const KLAVIYO_SORT_ALIASES: Record<string, string> = {
+  send_time: "scheduled_at",
+  "-send_time": "-scheduled_at",
 };
 
 /**

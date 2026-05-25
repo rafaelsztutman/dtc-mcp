@@ -31,4 +31,46 @@ describe("bridge registry", () => {
     delete process.env.SHOPIFY_CLIENT_SECRET;
     await expect(invoke("shopify.gql", ["{ shop { name } }", undefined])).rejects.toThrow(/Shopify not configured/);
   });
+
+  it("registers JS-idiomatic method aliases routing to canonical handlers", async () => {
+    const { methodPaths } = await import("../src/sandbox/bridge.js");
+    // A handful of common aliases the LLM tends to guess
+    expect(methodPaths).toContain("klaviyo.campaigns.getCampaigns");
+    expect(methodPaths).toContain("klaviyo.flows.getFlows");
+    expect(methodPaths).toContain("klaviyo.lists.getLists");
+    expect(methodPaths).toContain("klaviyo.campaigns.getCampaign");
+    expect(methodPaths).toContain("klaviyo.flows.getFlow");
+  });
+});
+
+describe("normalizeKlaviyoParams", () => {
+  it("passes canonical bracket params through unchanged", async () => {
+    const { normalizeKlaviyoParams } = await import("../src/sdk/klaviyo/host.js");
+    expect(normalizeKlaviyoParams({ "page[size]": "20", "fields[campaign]": "name,status" }))
+      .toEqual({ "page[size]": "20", "fields[campaign]": "name,status" });
+  });
+
+  it("translates pageSize → page[size] and pageCursor → page[cursor]", async () => {
+    const { normalizeKlaviyoParams } = await import("../src/sdk/klaviyo/host.js");
+    expect(normalizeKlaviyoParams({ pageSize: 20, pageCursor: "abc123" }))
+      .toEqual({ "page[size]": "20", "page[cursor]": "abc123" });
+  });
+
+  it("translates nested fields object to bracket form", async () => {
+    const { normalizeKlaviyoParams } = await import("../src/sdk/klaviyo/host.js");
+    expect(normalizeKlaviyoParams({ fields: { campaign: ["name", "status"], flow: ["trigger_type"] } }))
+      .toEqual({ "fields[campaign]": "name,status", "fields[flow]": "trigger_type" });
+  });
+
+  it("rewrites sort=-send_time to -scheduled_at (send_time isn't a valid Klaviyo sort key)", async () => {
+    const { normalizeKlaviyoParams } = await import("../src/sdk/klaviyo/host.js");
+    expect(normalizeKlaviyoParams({ sort: "-send_time" })).toEqual({ sort: "-scheduled_at" });
+    expect(normalizeKlaviyoParams({ sort: "send_time" })).toEqual({ sort: "scheduled_at" });
+  });
+
+  it("leaves valid sort values alone", async () => {
+    const { normalizeKlaviyoParams } = await import("../src/sdk/klaviyo/host.js");
+    expect(normalizeKlaviyoParams({ sort: "-scheduled_at" })).toEqual({ sort: "-scheduled_at" });
+    expect(normalizeKlaviyoParams({ sort: "name" })).toEqual({ sort: "name" });
+  });
 });
