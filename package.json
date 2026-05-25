@@ -1,6 +1,6 @@
 {
   "name": "dtc-mcp",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Code-execution MCP server for Klaviyo + Shopify analytics. The LLM writes TypeScript against typed SDKs in a stateful V8 sandbox — three composable tools instead of dozens.",
   "type": "module",
   "bin": {

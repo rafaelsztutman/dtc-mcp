@@ -1,6 +1,6 @@
 # dtc-mcp benchmark
 
-Head-to-head comparison of `dtc-mcp` v1.0.1 against Klaviyo's official MCP server on Klaviyo-only analytics tasks.
+Head-to-head comparison of `dtc-mcp` v1.0.2 against Klaviyo's official MCP server on Klaviyo-only analytics tasks.
 
 > This is a **portfolio benchmark**, not a peer-reviewed one. The methodology is documented honestly and the raw trajectories are committed so anyone can re-run, re-grade, or challenge the numbers.
 
