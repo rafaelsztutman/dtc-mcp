@@ -22,4 +22,4 @@ server.connect(transport).catch((err: unknown) => {
   process.exit(1);
 });
 
-console.error("[dtc-mcp] v1.0.3 ready");
+console.error("[dtc-mcp] v1.0.4 ready");

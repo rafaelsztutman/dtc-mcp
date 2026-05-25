@@ -6,7 +6,7 @@ import { registerReadDoc } from "./tools/read_doc.js";
 export function createServer(): McpServer {
   const server = new McpServer({
     name: "dtc-mcp",
-    version: "1.0.3",
+    version: "1.0.4",
   });
 
   registerExecuteCode(server);
