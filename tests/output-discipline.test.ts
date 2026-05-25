@@ -118,6 +118,50 @@ describe("sandbox helpers: summarize", () => {
   });
 });
 
+describe("sandbox helpers: globals", () => {
+  it("returns an empty object when nothing has been stashed", async () => {
+    const { runSandbox } = await import("../src/sandbox/runner.js");
+    const r = await runSandbox(`return globals();`, { timeoutMs: 5_000 });
+    expect(r.ok).toBe(true);
+    expect(r.result).toEqual({});
+  });
+
+  it("lists user-added globals with type summaries", async () => {
+    const { runSandbox } = await import("../src/sandbox/runner.js");
+    const r = await runSandbox(
+      `
+        globalThis.report = { data: [1, 2, 3], attributes: { total: 6 } };
+        globalThis.topIds = ['a', 'b', 'c', 'd'];
+        globalThis.metricId = 'abc123';
+        globalThis.placeholder = null;
+        return globals();
+      `,
+      { timeoutMs: 5_000 },
+    );
+    expect(r.ok).toBe(true);
+    expect(r.result).toEqual({
+      report: "Object(2 keys)",
+      topIds: "Array(4)",
+      metricId: '"abc123"',
+      placeholder: "null",
+    });
+  });
+
+  it("hides built-in helpers and SDK namespaces from the listing", async () => {
+    const { runSandbox } = await import("../src/sandbox/runner.js");
+    const r = await runSandbox(`return globals();`, { timeoutMs: 5_000 });
+    expect(r.ok).toBe(true);
+    const keys = Object.keys(r.result as Record<string, string>);
+    expect(keys).not.toContain("klaviyo");
+    expect(keys).not.toContain("shopify");
+    expect(keys).not.toContain("console");
+    expect(keys).not.toContain("pick");
+    expect(keys).not.toContain("topN");
+    expect(keys).not.toContain("summarize");
+    expect(keys).not.toContain("globals");
+  });
+});
+
 describe("response cap (host-side guard)", () => {
   it("passes small returns through unchanged", async () => {
     const { runSandbox } = await import("../src/sandbox/runner.js");

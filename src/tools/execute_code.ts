@@ -6,7 +6,7 @@ import { log } from "../config.js";
 
 const codeShape = {
   code: z.string().describe(
-    "TypeScript-like JavaScript to execute. Wrap top-level await calls naturally — the code runs in an async context. Return a value via `return ...` to receive it as the tool result. Globals available: `klaviyo`, `shopify`, `console`. No `fetch`/`process`/`require`/`import`. Add `// @timeout 2m` (max 5m) at the top to extend the default 30s wall-clock limit. Discover SDK methods via the `search_docs` tool.",
+    "TypeScript-like JavaScript to execute. Wrap top-level await calls naturally — the code runs in an async context. Return a value via `return ...` to receive it as the tool result. Globals available: `klaviyo`, `shopify`, `console`, plus helpers `pick`, `topN`, `summarize`, `globals`. No `fetch`/`process`/`require`/`import`. Add `// @timeout 2m` (max 5m) at the top to extend the default 30s wall-clock limit. Discover SDK methods via the `search_docs` tool.",
   ),
 };
 
@@ -17,11 +17,18 @@ The host applies rate limits, auth, and caching transparently. The sandbox keeps
 context alive per MCP connection — variables you assign to globalThis persist across
 calls, so iterative analyses don't re-fetch.
 
+STRONGLY RECOMMENDED for multi-turn investigations: stash any expensive fetch
+(reporting payloads, paginated lists, computed aggregates) on globalThis so
+follow-up turns reference the stashed data instead of re-fetching it. Re-running
+a 5,000-row report costs ~30k tokens; reading globalThis.report costs near zero.
+Call \`globals()\` at the start of any follow-up call to see what's already stashed.
+
 Available globals:
 - klaviyo: { get, post, paginate, campaigns, flows, lists, segments, profiles, events, metrics, reporting }
 - shopify: { gql, ql, timezone } — Shopify Admin GraphQL + ShopifyQL
 - console: { log, error, warn, info } — captured and returned as stdout
 - pick(value, schema) / topN(arr, n, by) / summarize(arr, opts) — output-discipline helpers
+- globals() — returns { name: summary } of everything currently stashed on globalThis
 - globalThis.* — assignments persist across calls within this MCP session
 
 Discovery: use read_doc({}) at session start to list every available SDK path, then

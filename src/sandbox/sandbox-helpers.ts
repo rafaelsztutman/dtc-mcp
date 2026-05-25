@@ -95,4 +95,58 @@ globalThis.summarize = function summarize(arr, opts) {
   }
   return result;
 };
+
+/**
+ * globals() — introspect what's currently stashed on globalThis.
+ *
+ * Returns { name: summary } for every user-added global, filtering out the
+ * sandbox's built-in helpers and standard JS globals. Use at the start of a
+ * follow-up turn to see what data is already available from prior calls and
+ * avoid re-fetching anything that's already there.
+ *
+ *   // Call 1
+ *   globalThis.flowReport = await klaviyo.reporting.flowValues({...});
+ *
+ *   // Call 2 (next turn) — check what's stashed before re-fetching
+ *   const stashed = globals();
+ *   // → { flowReport: 'Object(2 keys)' }
+ *
+ * Implementation: captures the baseline of Object.keys(globalThis) at module
+ * load time via an IIFE closure. Anything added after bootstrap is "user
+ * state" and shows up in the listing.
+ */
+(function () {
+  const __baseline = new Set(Object.keys(globalThis));
+  globalThis.globals = function globals() {
+    const out = {};
+    for (const k of Object.keys(globalThis)) {
+      if (__baseline.has(k)) continue;
+      if (k === 'globals') continue;
+      if (k.startsWith('__')) continue;
+      let summary;
+      try {
+        const v = globalThis[k];
+        if (v === null || v === undefined) {
+          summary = String(v);
+        } else if (Array.isArray(v)) {
+          summary = 'Array(' + v.length + ')';
+        } else if (typeof v === 'object') {
+          summary = 'Object(' + Object.keys(v).length + ' keys)';
+        } else if (typeof v === 'string') {
+          summary = v.length > 40
+            ? 'string(' + v.length + ' chars)'
+            : JSON.stringify(v);
+        } else if (typeof v === 'function') {
+          summary = 'function';
+        } else {
+          summary = typeof v + ': ' + String(v);
+        }
+      } catch (_e) {
+        summary = '<unreadable>';
+      }
+      out[k] = summary;
+    }
+    return out;
+  };
+})();
 `.trim();
