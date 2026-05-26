@@ -1,0 +1,48 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1100 560" width="1100" height="560">
+  <rect x="0" y="0" width="1100" height="560" fill="#F5F1EA"/>
+  <style>text { font-family: -apple-system,BlinkMacSystemFont,Inter,'Segoe UI',sans-serif; }</style>
+  <text x="90" y="36" font-size="22" font-weight="600" fill="#2A1F18">dtc-mcp recovery: v1.0.4 baseline vs v1.0.6 (post-ablation)</text>
+  <text x="90" y="60" font-size="13" fill="#7A6B5F">tokens per task · mean of 2 trials · dtc-mcp only</text>
+  <line x1="90" x2="1050" y1="450" y2="450" stroke="#E5DDD0" stroke-width="1"/>
+  <text x="78" y="454" font-size="11" fill="#7A6B5F" text-anchor="end">0</text>
+  <line x1="90" x2="1050" y1="378" y2="378" stroke="#E5DDD0" stroke-width="1"/>
+  <text x="78" y="382" font-size="11" fill="#7A6B5F" text-anchor="end">16k</text>
+  <line x1="90" x2="1050" y1="306" y2="306" stroke="#E5DDD0" stroke-width="1"/>
+  <text x="78" y="310" font-size="11" fill="#7A6B5F" text-anchor="end">32k</text>
+  <line x1="90" x2="1050" y1="234" y2="234" stroke="#E5DDD0" stroke-width="1"/>
+  <text x="78" y="238" font-size="11" fill="#7A6B5F" text-anchor="end">48k</text>
+  <line x1="90" x2="1050" y1="162" y2="162" stroke="#E5DDD0" stroke-width="1"/>
+  <text x="78" y="166" font-size="11" fill="#7A6B5F" text-anchor="end">64k</text>
+  <line x1="90" x2="1050" y1="90" y2="90" stroke="#E5DDD0" stroke-width="1"/>
+  <text x="78" y="94" font-size="11" fill="#7A6B5F" text-anchor="end">80k</text>
+  <text x="30" y="270" font-size="12" fill="#7A6B5F" text-anchor="middle" transform="rotate(-90, 30, 270)">tokens</text>
+  <rect x="96" y="276.1875" width="111" height="173.8125" fill="#7A6B5F" rx="3"/>
+  <text x="151.5" y="270.1875" font-size="11" fill="#2A1F18" text-anchor="middle" font-weight="500">39k</text>
+  <rect x="213" y="196.15050000000002" width="111" height="253.84949999999998" fill="#C9532E" rx="3"/>
+  <text x="268.5" y="190.15050000000002" font-size="11" fill="#2A1F18" text-anchor="middle" font-weight="500">56k</text>
+  <text x="210" y="478" font-size="14" fill="#2A1F18" text-anchor="middle">task 02</text>
+  <text x="210" y="496" font-size="12" fill="#7A6B5F" text-anchor="middle">(1 turn · baseline)</text>
+  <rect x="336" y="258.822" width="111" height="191.178" fill="#7A6B5F" rx="3"/>
+  <text x="391.5" y="252.822" font-size="11" fill="#2A1F18" text-anchor="middle" font-weight="500">42k</text>
+  <rect x="453" y="245.92499999999998" width="111" height="204.07500000000002" fill="#C9532E" rx="3"/>
+  <text x="508.5" y="239.92499999999998" font-size="11" fill="#2A1F18" text-anchor="middle" font-weight="500">45k</text>
+  <text x="450" y="478" font-size="14" fill="#2A1F18" text-anchor="middle">task 05</text>
+  <text x="450" y="496" font-size="12" fill="#7A6B5F" text-anchor="middle">(2 turn · short)</text>
+  <rect x="576" y="260.001" width="111" height="189.999" fill="#7A6B5F" rx="3"/>
+  <text x="631.5" y="254.00099999999998" font-size="11" fill="#2A1F18" text-anchor="middle" font-weight="500">42k</text>
+  <rect x="693" y="277.884" width="111" height="172.116" fill="#C9532E" rx="3"/>
+  <text x="748.5" y="271.884" font-size="11" fill="#2A1F18" text-anchor="middle" font-weight="500">38k</text>
+  <text x="690" y="478" font-size="14" fill="#2A1F18" text-anchor="middle">task 06</text>
+  <text x="690" y="496" font-size="12" fill="#7A6B5F" text-anchor="middle">(5 turn · medium)</text>
+  <rect x="816" y="154.2645" width="111" height="295.7355" fill="#7A6B5F" rx="3"/>
+  <text x="871.5" y="148.2645" font-size="11" fill="#2A1F18" text-anchor="middle" font-weight="500">66k</text>
+  <rect x="933" y="187.875" width="111" height="262.125" fill="#C9532E" rx="3"/>
+  <text x="988.5" y="181.875" font-size="11" fill="#2A1F18" text-anchor="middle" font-weight="500">58k</text>
+  <text x="930" y="478" font-size="14" fill="#2A1F18" text-anchor="middle">task 09</text>
+  <text x="930" y="496" font-size="12" fill="#7A6B5F" text-anchor="middle">(10 turn · long)</text>
+  <line x1="90" x2="1050" y1="450" y2="450" stroke="#2A1F18" stroke-width="1.5"/>
+  <rect x="90" y="527" width="14" height="14" fill="#7A6B5F" rx="2"/>
+  <text x="112" y="538" font-size="13" fill="#2A1F18">v1.0.4 baseline</text>
+  <rect x="264.5" y="527" width="14" height="14" fill="#C9532E" rx="2"/>
+  <text x="286.5" y="538" font-size="13" fill="#2A1F18">v1.0.6 recovered</text>
+</svg>

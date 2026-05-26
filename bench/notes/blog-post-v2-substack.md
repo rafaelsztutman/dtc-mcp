@@ -210,13 +210,20 @@ The teaching surface isn't the description text. It's the response shape.
 
 To validate end-to-end, I ran a clean 16-cell sweep on v1.0.6: one task per turn-count bucket (1 / 2 / 5 / 10), no segments (cross-resource segment composition is a known v1.1 problem, not a description issue), both MCPs, two trials each. Same harness, same Klaviyo account, same Sonnet judge.
 
-![Fresh v1.0.6 run vs v1.0.4 baseline — dtc-mcp tokens per task](04-fresh-v106.png)
+![v1.0.6 fresh bench: dtc-mcp vs Klaviyo official MCP across four representative tasks](04-fresh-head-to-head.png)
 
-[FRESH-RUN COMMENTARY PARAGRAPH WILL BE FINALIZED ONCE BENCH FINISHES. Will cover: the v1.0.4 → v1.0.6 recovery + parity, pass-rate column at ~99% both sides, the duration improvement on long tasks, the qualitative observation about how the new `state` field in the response shaped agent behavior. Numbers go inline in the chart caption.]
+dtc-mcp wins tokens on 3 of 4 tasks. The shape:
 
-The shape of the result, qualitatively: dtc-mcp recovered fully from the v1.0.5 regression and now beats v1.0.4 on duration and tool-call count across the board, with tokens at parity or better. On the longest task (the 10-turn postmortem), dtc-mcp's per-cell wall-clock cut roughly in half versus v1.0.4. The official MCP numbers were unchanged across versions (as expected — only dtc-mcp's description changed).
+- **Task 06 (5-turn medium, campaign-performance investigation): dtc 38k vs klv 63k. −39%.** The biggest win in the entire suite. This is exactly the architecture's sweet spot — five turns of compounding analysis, every turn requiring aggregation or filtering of the fetched report. dtc-mcp keeps the data in-sandbox and does the math there; the official MCP has to stream the relevant rows back into context each turn.
+- **Task 09 (10-turn long, campaign postmortem): dtc 58k vs klv 80k. −27%.** The long-conversation win, fresh and clean. Also notably, dtc-mcp's task 09 v1.0.6 numbers came in *lower* than the v1.0.4 baseline (66k → 58k), confirming the v1.0.5 regression fully reversed and the `state` field in the response is doing real work.
+- **Task 05 (2-turn short, campaign comparison): dtc 45k vs klv 50k. −9%.** Modest but real.
+- **Task 02 (1-turn baseline, top flow revenue): dtc 56k vs klv 50k. +13% — dtc loses.** This is the consistent baseline weakness the post predicted: when there's nothing to aggregate or compose, `execute_code`'s overhead doesn't amortize. The official MCP's tight `get_campaign_report` returns the data directly; dtc-mcp routes the same data through `execute_code`'s wrapper. The −39% win on task 06 is the same architectural property; the +13% loss on task 02 is its cost.
 
-The interesting *qualitative* finding was watching how the agent used the new `state` field. In the medium-bucket tasks (5 turns), the agent visibly took a different shape: turn 1 fetches a report and stashes it, turn 2's tool-result envelope shows `state: { report: "Object(...)" }`, and the agent's turn-2 code references `globalThis.report` directly instead of re-fetching. The structural cue did what the prescriptive prose hadn't.
+A caveat the chart understates: there's real trial-to-trial variance on the baseline task. Task 02 dtc trial 1 came in at 74k; trial 2 at 38k (basically matching v1.0.4). The 56k mean reflects a high-variance distribution, not a stable regression. A third trial would tighten this — the harness supports `--retry` for exactly this case.
+
+The interesting *qualitative* finding was watching how the agent used the new `state` field. On task 06's 5-turn trial 2: turn 1 fetches a report and stashes it, turn 2's tool-result envelope shows `state: { report: "Object(2 keys)", metricId: "string(8 chars)" }`, and the agent's turn-2 code references `globalThis.report` directly instead of re-fetching. That trial completed in 3 tool calls total across 5 turns. The structural cue did what the prescriptive prose hadn't. Klaviyo's official MCP made 4 calls in the same trial — close on call count but its tool-definition payload is heavier, hence the token gap.
+
+Pass rates from the Sonnet judge stayed at ~99% both sides — no MCP cut corners to get its numbers down. Quality is a wash; efficiency is the real story.
 
 ## What I'd tell someone building their own MCP
 

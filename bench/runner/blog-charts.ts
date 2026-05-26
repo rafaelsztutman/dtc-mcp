@@ -12,7 +12,7 @@
  *   tsx bench/runner/blog-charts.ts sample
  */
 
-import { mkdirSync, writeFileSync } from "node:fs";
+import { mkdirSync, writeFileSync, readFileSync } from "node:fs";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -327,14 +327,28 @@ function chart3_ablation_hallucinations(): string {
   });
 }
 
-function chart4_fresh_v104_v106(data: { tasks: string[]; v104: number[]; v106: number[] }): string {
+function chart4_fresh_head_to_head(data: { tasks: string[]; dtc: number[]; klv: number[] }): string {
   return groupedBarChart({
-    title: "v1.0.6 recovers + matches v1.0.4 on dtc-mcp tokens",
-    subtitle: "fresh 16-cell run · mean of 2 trials · dtc-mcp only",
+    title: "v1.0.6 fresh bench: dtc-mcp vs Klaviyo official MCP",
+    subtitle: "fresh 16-cell run · mean of 2 trials · Klaviyo live data",
     categories: data.tasks,
     series: [
-      { label: "v1.0.4",  color: COLORS.muted,   values: data.v104 },
-      { label: "v1.0.6",  color: COLORS.primary, values: data.v106 },
+      { label: "dtc-mcp v1.0.6",      color: COLORS.primary,   values: data.dtc },
+      { label: "klaviyo official MCP", color: COLORS.secondary, values: data.klv },
+    ],
+    yLabel: "tokens",
+    valueFormatter: fmtK,
+  });
+}
+
+function chart5_v104_vs_v106_dtc(data: { tasks: string[]; v104: number[]; v106: number[] }): string {
+  return groupedBarChart({
+    title: "dtc-mcp recovery: v1.0.4 baseline vs v1.0.6 (post-ablation)",
+    subtitle: "tokens per task · mean of 2 trials · dtc-mcp only",
+    categories: data.tasks,
+    series: [
+      { label: "v1.0.4 baseline", color: COLORS.muted,   values: data.v104 },
+      { label: "v1.0.6 recovered", color: COLORS.primary, values: data.v106 },
     ],
     yLabel: "tokens",
     valueFormatter: fmtK,
@@ -404,26 +418,31 @@ if (which === "all" || which === "3b") {
   writeChart("03b-ablation-table", "Ablation full table", svg);
 }
 
-if (which === "4") {
-  // Chart 4 needs the fresh-run data from state.json. Read it.
+if (which === "4" || which === "all") {
+  // Read the fresh-run cells from state.json + the v1.0.4 baseline snapshot.
   const statePath = "/Users/roliveira/ai-projects/dtc-mcp/bench/results/2026-05-25_13-57-02/state.json";
-  const s = JSON.parse(require("node:fs").readFileSync(statePath, "utf8"));
+  const s = JSON.parse(readFileSync(statePath, "utf8"));
   const taskIds = [
     "02-baseline-top-flow-revenue",
     "05-short-campaign-comparison",
     "06-medium-campaign-performance-investigation",
     "09-long-campaign-postmortem-and-strategy",
   ];
-  const taskLabels = ["task 02\n(1 turn)", "task 05\n(2 turn)", "task 06\n(5 turn)", "task 09\n(10 turn)"];
-  function dtcMean(taskId: string): number {
+  const taskLabels = [
+    "task 02\n(1 turn · baseline)",
+    "task 05\n(2 turn · short)",
+    "task 06\n(5 turn · medium)",
+    "task 09\n(10 turn · long)",
+  ];
+  function meanFor(taskId: string, mcp: string): number {
     const cells = Object.values(s.cells).filter(
-      (c: any) => c.taskId === taskId && c.mcp === "dtc-mcp" && c.status === "recorded",
+      (c: any) => c.taskId === taskId && c.mcp === mcp && c.status === "recorded",
     ) as any[];
     if (cells.length === 0) return 0;
     return Math.round(cells.reduce((a, c) => a + (c.usage?.totalTokens ?? 0), 0) / cells.length);
   }
   const baseline = JSON.parse(
-    require("node:fs").readFileSync(
+    readFileSync(
       "/Users/roliveira/ai-projects/dtc-mcp/bench/notes/v1.0.4-baseline-blog-16cells.json",
       "utf8",
     ),
@@ -433,9 +452,12 @@ if (which === "4") {
     const vals = ids.map((id) => baseline.cells[id]?.tokens ?? 0).filter((v: number) => v > 0);
     return vals.length ? Math.round(vals.reduce((a: number, b: number) => a + b, 0) / vals.length) : 0;
   }
+  const dtc = taskIds.map((t) => meanFor(t, "dtc-mcp"));
+  const klv = taskIds.map((t) => meanFor(t, "klaviyo-mcp"));
   const v104 = taskIds.map(dtcMeanBaseline);
-  const v106 = taskIds.map(dtcMean);
-  console.log("v1.0.4 dtc:", v104);
-  console.log("v1.0.6 dtc:", v106);
-  writeChart("04-fresh-v106", "Fresh v1.0.4 vs v1.0.6 (dtc-mcp)", chart4_fresh_v104_v106({ tasks: taskLabels, v104, v106 }));
+  console.log("v1.0.6 fresh dtc:", dtc);
+  console.log("v1.0.6 fresh klv:", klv);
+  console.log("v1.0.4 baseline dtc:", v104);
+  writeChart("04-fresh-head-to-head", "v1.0.6 fresh head-to-head", chart4_fresh_head_to_head({ tasks: taskLabels, dtc, klv }));
+  writeChart("05-v104-vs-v106-dtc", "v1.0.4 vs v1.0.6 dtc recovery", chart5_v104_vs_v106_dtc({ tasks: taskLabels, v104, v106: dtc }));
 }
