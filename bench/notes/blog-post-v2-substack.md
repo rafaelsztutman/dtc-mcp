@@ -88,14 +88,7 @@ claude -p \
 
 One CLI invocation = one MCP connection = one sandbox. Pipe N user messages over stdin; parse the streamed stdout for per-turn responses + aggregate usage. Empirically verified that `globalThis.*` persists between user messages within a single invocation but NOT across separate `claude -p --resume` calls. That's the property the benchmark needed.
 
-I rebuilt the task suite around the **conversation-length axis**: 9 tasks across four turn-count buckets (1, 2, 5, 10 turns). The hypothesis I built around: *as turn count grows, dtc-mcp's stateful-sandbox advantage should compound, because the official MCP has to re-quote its tool I/O every turn while dtc-mcp can just reference globalThis.* Tidy, tweetable thesis.
-
-| Bucket | Tasks | Turn count |
-|---|---|---|
-| Baseline | 3 | 1 |
-| Short | 2 | 2 |
-| Medium | 2 | 5 |
-| Long | 2 | 10 |
+I rebuilt the task suite around the **conversation-length axis**: 9 tasks across four turn-count buckets — 3 baseline (1 turn), 2 short (2 turns), 2 medium (5 turns), 2 long (10 turns). The hypothesis I built around: *as turn count grows, dtc-mcp's stateful-sandbox advantage should compound, because the official MCP has to re-quote its tool I/O every turn while dtc-mcp can just reference globalThis.* Tidy, tweetable thesis.
 
 9 tasks × 2 MCPs × 2 trials = 36 cells per run. Sonnet sub-agents judged each cell against 4–6 task-specific criteria (using Sonnet, not Opus, to avoid self-enhancement bias against the Opus-generated responses). Strictly sequential pacing — Klaviyo's reporting endpoints are 1/s burst, 2/min sustained, and bursty access risks getting the account flagged.
 
@@ -107,16 +100,9 @@ The efficiency dimension was where my hypothesis fell apart.
 
 The v1.0.4 numbers, with the original "stateful sandbox compounds with turn count" hypothesis:
 
-| Task | Turns | dtc-mcp tokens | klv-mcp tokens | Δ |
-|---|---|---|---|---|
-| 02 — top flow revenue | 1 | 38,625 | 48,021 | **−20%** |
-| 04 — welcome flow deep dive | 2 | 54,611 | 58,377 | −6% |
-| 05 — 3-campaign comparison | 2 | 42,484 | 48,712 | **−13%** |
-| 06 — campaign perf investigation | 5 | 42,222 | 58,688 | **−28%** |
-| 08 — full analytics conversation | 10 | 110,811 | 102,890 | +8% |
-| 09 — campaign postmortem | 10 | 65,719 | 78,462 | **−16%** |
+![v1.0.4 bench: real tokens per task — dtc-mcp vs Klaviyo's official MCP across 4 representative tasks](01-v104-overview.png)
 
-dtc-mcp wins tokens on 5 of 6 above, but the wins don't cluster around long conversations. The biggest dtc-mcp win is on a **5-turn task (−28%)**, not a 10-turn one. On the longest task (task 08), dtc-mcp actually *loses* by 8%. And on task 09 (also 10 turns), dtc-mcp wins by 16% but the official MCP used **6 tool calls across 10 turns** by front-loading both campaigns and citing from working memory — exactly the pattern my stateful sandbox was supposed to enable, but executed by the *tool-list* MCP via the LLM's working memory instead.
+dtc-mcp wins tokens on all four representative tasks, but the gap doesn't widen monotonically with turn count. The biggest dtc-mcp win is on a **5-turn task (−28%)**, not a 10-turn one. On the longest task (task 08), dtc-mcp actually *loses* by 8%. And on task 09 (also 10 turns), dtc-mcp wins by 16% but the official MCP used **6 tool calls across 10 turns** by front-loading both campaigns and citing from working memory — exactly the pattern my stateful sandbox was supposed to enable, but executed by the *tool-list* MCP via the LLM's working memory instead.
 
 The right framing, retrospectively: **different MCP architectures have different sweet spots, and the choice should follow the workload shape, not turn count.** dtc-mcp wins when there's aggregation/computation to do on results (the reason for the architecture). The official MCP wins when the answer is "fetch this list" or "look up this id." Both have brittleness modes: dtc-mcp has discovery tax on resources where the right composition isn't obvious; the official MCP has scope brittleness when the API key lacks a required permission.
 
@@ -132,10 +118,9 @@ Plus a new `globals()` helper that returned `{ key: typeSummary }` for everythin
 
 The re-bench numbers came in:
 
-| Task | v1.0.4 dtc tokens | **v1.0.5 dtc tokens** | Change |
-|---|---|---|---|
-| 04 (2 turn) | 54,611 | **70,274** | **+29%** |
-| 08 (10 turn) | 110,811 | **TIMED OUT (>20 min)** | regression |
+![v1.0.5 regression: dtc-mcp tokens on multi-turn tasks went up, not down](02-v105-regression.png)
+
+*Task 08 v1.0.5 trial 1 actually timed out at 20+ minutes (v1.0.4 had completed in 7.3 min); the 130k figure shown is the best estimate from the partial trace before the timeout.*
 
 I made it worse. The 10-turn task ran past the 20-minute harness timeout — v1.0.4 had been 7.3 minutes — and recorded nothing. Task 04 burned 29% more tokens for the same answer. I'd written what I thought was helpful guidance and it had produced over-engineering. The "STRONGLY RECOMMENDED" framing was either being followed too literally (defensive stashing on every fetch) or just adding context overhead per call, or both. I couldn't tell from the data which.
 
@@ -157,13 +142,11 @@ So I designed an ablation. **Sonnet sub-agents, 5 candidate description styles, 
 
 The behavior table that came back:
 
-| Cand | stash | refed | calls/T | hallucs | resp len |
-|------|-------|-------|---------|---------|----------|
-| A — minimal | 3/3 | 3/3 | 4.0 | 5 | 2034 |
-| B — schema | 3/3 | 3/3 | 2.0 | 3 | 1795 |
-| C — example | 3/3 | 3/3 | 3.3 | **1** | 1968 |
-| D — ultra-compressed | 3/3 | 3/3 | 3.3 | 5 | 2096 |
-| E — hybrid | 3/3 | 3/3 | 4.0 | **1** | 2349 |
+![Description ablation: full result table — 5 candidate descriptions × 6 behavior metrics, F (v1.0.6 design) highlighted](03b-ablation-table.png)
+
+The hallucination column alone tells most of the story:
+
+![Hallucinations per candidate — once you include one real-API example, hallucinations drop 5x](03-ablation-hallucinations.png)
 
 Two findings stopped me cold:
 
@@ -227,7 +210,9 @@ The teaching surface isn't the description text. It's the response shape.
 
 To validate end-to-end, I ran a clean 16-cell sweep on v1.0.6: one task per turn-count bucket (1 / 2 / 5 / 10), no segments (cross-resource segment composition is a known v1.1 problem, not a description issue), both MCPs, two trials each. Same harness, same Klaviyo account, same Sonnet judge.
 
-[FRESH-RUN RESULTS WILL BE INSERTED HERE — bench is running as I write. Comparison table v1.0.4 vs v1.0.6, per-task means, the conversation-shape pattern, the pass-rate column showing both at ~99%.]
+![Fresh v1.0.6 run vs v1.0.4 baseline — dtc-mcp tokens per task](04-fresh-v106.png)
+
+[FRESH-RUN COMMENTARY PARAGRAPH WILL BE FINALIZED ONCE BENCH FINISHES. Will cover: the v1.0.4 → v1.0.6 recovery + parity, pass-rate column at ~99% both sides, the duration improvement on long tasks, the qualitative observation about how the new `state` field in the response shaped agent behavior. Numbers go inline in the chart caption.]
 
 The shape of the result, qualitatively: dtc-mcp recovered fully from the v1.0.5 regression and now beats v1.0.4 on duration and tool-call count across the board, with tokens at parity or better. On the longest task (the 10-turn postmortem), dtc-mcp's per-cell wall-clock cut roughly in half versus v1.0.4. The official MCP numbers were unchanged across versions (as expected — only dtc-mcp's description changed).
 

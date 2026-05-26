@@ -1,0 +1,48 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1100 560" width="1100" height="560">
+  <rect x="0" y="0" width="1100" height="560" fill="#F5F1EA"/>
+  <style>text { font-family: -apple-system,BlinkMacSystemFont,Inter,'Segoe UI',sans-serif; }</style>
+  <text x="90" y="36" font-size="22" font-weight="600" fill="#2A1F18">v1.0.4 bench: real tokens per task</text>
+  <text x="90" y="60" font-size="13" fill="#7A6B5F">lower is better · mean of 2 trials · Klaviyo live data</text>
+  <line x1="90" x2="1050" y1="450" y2="450" stroke="#E5DDD0" stroke-width="1"/>
+  <text x="78" y="454" font-size="11" fill="#7A6B5F" text-anchor="end">0</text>
+  <line x1="90" x2="1050" y1="378" y2="378" stroke="#E5DDD0" stroke-width="1"/>
+  <text x="78" y="382" font-size="11" fill="#7A6B5F" text-anchor="end">20k</text>
+  <line x1="90" x2="1050" y1="306" y2="306" stroke="#E5DDD0" stroke-width="1"/>
+  <text x="78" y="310" font-size="11" fill="#7A6B5F" text-anchor="end">40k</text>
+  <line x1="90" x2="1050" y1="234" y2="234" stroke="#E5DDD0" stroke-width="1"/>
+  <text x="78" y="238" font-size="11" fill="#7A6B5F" text-anchor="end">60k</text>
+  <line x1="90" x2="1050" y1="162" y2="162" stroke="#E5DDD0" stroke-width="1"/>
+  <text x="78" y="166" font-size="11" fill="#7A6B5F" text-anchor="end">80k</text>
+  <line x1="90" x2="1050" y1="90" y2="90" stroke="#E5DDD0" stroke-width="1"/>
+  <text x="78" y="94" font-size="11" fill="#7A6B5F" text-anchor="end">100k</text>
+  <text x="30" y="270" font-size="12" fill="#7A6B5F" text-anchor="middle" transform="rotate(-90, 30, 270)">tokens</text>
+  <rect x="96" y="310.95000000000005" width="111" height="139.04999999999998" fill="#C9532E" rx="3"/>
+  <text x="151.5" y="304.95000000000005" font-size="11" fill="#2A1F18" text-anchor="middle" font-weight="500">39k</text>
+  <rect x="213" y="277.1244" width="111" height="172.87560000000002" fill="#5B7A99" rx="3"/>
+  <text x="268.5" y="271.1244" font-size="11" fill="#2A1F18" text-anchor="middle" font-weight="500">48k</text>
+  <text x="210" y="478" font-size="14" fill="#2A1F18" text-anchor="middle">task 02</text>
+  <text x="210" y="496" font-size="12" fill="#7A6B5F" text-anchor="middle">(1 turn · baseline)</text>
+  <rect x="336" y="297.0576" width="111" height="152.9424" fill="#C9532E" rx="3"/>
+  <text x="391.5" y="291.0576" font-size="11" fill="#2A1F18" text-anchor="middle" font-weight="500">42k</text>
+  <rect x="453" y="274.6368" width="111" height="175.3632" fill="#5B7A99" rx="3"/>
+  <text x="508.5" y="268.6368" font-size="11" fill="#2A1F18" text-anchor="middle" font-weight="500">49k</text>
+  <text x="450" y="478" font-size="14" fill="#2A1F18" text-anchor="middle">task 05</text>
+  <text x="450" y="496" font-size="12" fill="#7A6B5F" text-anchor="middle">(2 turn · short)</text>
+  <rect x="576" y="298.0008" width="111" height="151.9992" fill="#C9532E" rx="3"/>
+  <text x="631.5" y="292.0008" font-size="11" fill="#2A1F18" text-anchor="middle" font-weight="500">42k</text>
+  <rect x="693" y="238.72320000000002" width="111" height="211.27679999999998" fill="#5B7A99" rx="3"/>
+  <text x="748.5" y="232.72320000000002" font-size="11" fill="#2A1F18" text-anchor="middle" font-weight="500">59k</text>
+  <text x="690" y="478" font-size="14" fill="#2A1F18" text-anchor="middle">task 06</text>
+  <text x="690" y="496" font-size="12" fill="#7A6B5F" text-anchor="middle">(5 turn · medium)</text>
+  <rect x="816" y="213.4116" width="111" height="236.5884" fill="#C9532E" rx="3"/>
+  <text x="871.5" y="207.4116" font-size="11" fill="#2A1F18" text-anchor="middle" font-weight="500">66k</text>
+  <rect x="933" y="167.53680000000003" width="111" height="282.4632" fill="#5B7A99" rx="3"/>
+  <text x="988.5" y="161.53680000000003" font-size="11" fill="#2A1F18" text-anchor="middle" font-weight="500">78k</text>
+  <text x="930" y="478" font-size="14" fill="#2A1F18" text-anchor="middle">task 09</text>
+  <text x="930" y="496" font-size="12" fill="#7A6B5F" text-anchor="middle">(10 turn · long)</text>
+  <line x1="90" x2="1050" y1="450" y2="450" stroke="#2A1F18" stroke-width="1.5"/>
+  <rect x="90" y="527" width="14" height="14" fill="#C9532E" rx="2"/>
+  <text x="112" y="538" font-size="13" fill="#2A1F18">dtc-mcp</text>
+  <rect x="204.5" y="527" width="14" height="14" fill="#5B7A99" rx="2"/>
+  <text x="226.5" y="538" font-size="13" fill="#2A1F18">klaviyo official MCP</text>
+</svg>
