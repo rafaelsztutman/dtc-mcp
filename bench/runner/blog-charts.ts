@@ -46,12 +46,12 @@ interface ChartConfig {
   subtitle?: string;
 }
 
-function chartShell(cfg: ChartConfig, inner: string): string {
+function chartShell(cfg: ChartConfig, inner: string, titleY = 50, subtitleY = 84): string {
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${cfg.width} ${cfg.height}" width="${cfg.width}" height="${cfg.height}">
   <rect x="0" y="0" width="${cfg.width}" height="${cfg.height}" fill="${COLORS.bg}"/>
   <style>text { font-family: ${FONT}; }</style>
-  <text x="${cfg.margin.left}" y="36" font-size="22" font-weight="600" fill="${COLORS.fg}">${escape(cfg.title)}</text>
-  ${cfg.subtitle ? `<text x="${cfg.margin.left}" y="60" font-size="13" fill="${COLORS.muted}">${escape(cfg.subtitle)}</text>` : ""}
+  <text x="${cfg.margin.left}" y="${titleY}" font-size="30" font-weight="700" fill="${COLORS.fg}">${escape(cfg.title)}</text>
+  ${cfg.subtitle ? `<text x="${cfg.margin.left}" y="${subtitleY}" font-size="17" fill="${COLORS.muted}">${escape(cfg.subtitle)}</text>` : ""}
   ${inner}
 </svg>`;
 }
@@ -79,9 +79,9 @@ interface GroupedBarChartArgs {
 
 function groupedBarChart(args: GroupedBarChartArgs): string {
   const cfg: ChartConfig = {
-    width: 1100,
-    height: 560,
-    margin: { top: 90, right: 50, bottom: 110, left: 90 },
+    width: 1000,
+    height: 1000,
+    margin: { top: 130, right: 60, bottom: 160, left: 120 },
     title: args.title,
     subtitle: args.subtitle,
   };
@@ -107,7 +107,7 @@ function groupedBarChart(args: GroupedBarChartArgs): string {
 
   const groupCount = args.categories.length;
   const groupWidth = plotW / groupCount;
-  const barGap = 6;
+  const barGap = 8;
   const barWidth = (groupWidth - barGap * (args.series.length + 1)) / args.series.length;
   const groupInnerPad = (groupWidth - barWidth * args.series.length - barGap * (args.series.length - 1)) / 2;
 
@@ -118,17 +118,17 @@ function groupedBarChart(args: GroupedBarChartArgs): string {
     const v = yStep * i;
     const y = cfg.margin.top + plotH - (v / yMax) * plotH;
     inner.push(
-      `<line x1="${cfg.margin.left}" x2="${cfg.margin.left + plotW}" y1="${y}" y2="${y}" stroke="${COLORS.grid}" stroke-width="1"/>`,
+      `<line x1="${cfg.margin.left}" x2="${cfg.margin.left + plotW}" y1="${y}" y2="${y}" stroke="${COLORS.grid}" stroke-width="1.5"/>`,
     );
     inner.push(
-      `<text x="${cfg.margin.left - 12}" y="${y + 4}" font-size="11" fill="${COLORS.muted}" text-anchor="end">${fmt(v)}</text>`,
+      `<text x="${cfg.margin.left - 16}" y="${y + 6}" font-size="16" fill="${COLORS.muted}" text-anchor="end">${fmt(v)}</text>`,
     );
   }
 
   // Y axis label
   if (args.yLabel) {
     inner.push(
-      `<text x="${cfg.margin.left - 60}" y="${cfg.margin.top + plotH / 2}" font-size="12" fill="${COLORS.muted}" text-anchor="middle" transform="rotate(-90, ${cfg.margin.left - 60}, ${cfg.margin.top + plotH / 2})">${escape(args.yLabel)}</text>`,
+      `<text x="${cfg.margin.left - 90}" y="${cfg.margin.top + plotH / 2}" font-size="16" fill="${COLORS.muted}" text-anchor="middle" transform="rotate(-90, ${cfg.margin.left - 90}, ${cfg.margin.top + plotH / 2})">${escape(args.yLabel)}</text>`,
     );
   }
 
@@ -142,42 +142,48 @@ function groupedBarChart(args: GroupedBarChartArgs): string {
       const barX = groupX + groupInnerPad + si * (barWidth + barGap);
       const barY = cfg.margin.top + plotH - barH;
       inner.push(
-        `<rect x="${barX}" y="${barY}" width="${barWidth}" height="${barH}" fill="${s.color}" rx="3"/>`,
+        `<rect x="${barX}" y="${barY}" width="${barWidth}" height="${barH}" fill="${s.color}" rx="4"/>`,
       );
-      // Value label on top
+      // Value label on top — big and bold so mobile readers see it instantly
       inner.push(
-        `<text x="${barX + barWidth / 2}" y="${barY - 6}" font-size="11" fill="${COLORS.fg}" text-anchor="middle" font-weight="500">${fmt(v)}</text>`,
+        `<text x="${barX + barWidth / 2}" y="${barY - 10}" font-size="18" fill="${COLORS.fg}" text-anchor="middle" font-weight="700">${fmt(v)}</text>`,
       );
     }
     // Category label — supports two-line labels via "\n"
     const catX = groupX + groupWidth / 2;
-    const catY = cfg.margin.top + plotH + 28;
+    const catY = cfg.margin.top + plotH + 36;
     const parts = args.categories[gi].split("\n");
     for (let li = 0; li < parts.length; li++) {
-      const fontSize = li === 0 ? 14 : 12;
+      const fontSize = li === 0 ? 19 : 15;
+      const fontWeight = li === 0 ? "600" : "400";
       const color = li === 0 ? COLORS.fg : COLORS.muted;
       inner.push(
-        `<text x="${catX}" y="${catY + li * 18}" font-size="${fontSize}" fill="${color}" text-anchor="middle">${escape(parts[li])}</text>`,
+        `<text x="${catX}" y="${catY + li * 26}" font-size="${fontSize}" font-weight="${fontWeight}" fill="${color}" text-anchor="middle">${escape(parts[li])}</text>`,
       );
     }
   }
 
   // X axis baseline
   inner.push(
-    `<line x1="${cfg.margin.left}" x2="${cfg.margin.left + plotW}" y1="${cfg.margin.top + plotH}" y2="${cfg.margin.top + plotH}" stroke="${COLORS.fg}" stroke-width="1.5"/>`,
+    `<line x1="${cfg.margin.left}" x2="${cfg.margin.left + plotW}" y1="${cfg.margin.top + plotH}" y2="${cfg.margin.top + plotH}" stroke="${COLORS.fg}" stroke-width="2"/>`,
   );
 
-  // Legend (bottom)
-  const legendY = cfg.height - 22;
-  let legendX = cfg.margin.left;
-  for (const s of args.series) {
+  // Legend (bottom) — bigger, well-spaced
+  const legendY = cfg.height - 30;
+  // Compute total legend width then center it
+  let totalLegendW = 0;
+  const legendEntryWidths = args.series.map((s) => 22 + s.label.length * 10 + 40);
+  totalLegendW = legendEntryWidths.reduce((a, b) => a + b, 0) - 40;
+  let legendX = cfg.margin.left + (plotW - totalLegendW) / 2;
+  for (let si = 0; si < args.series.length; si++) {
+    const s = args.series[si];
     inner.push(
-      `<rect x="${legendX}" y="${legendY - 11}" width="14" height="14" fill="${s.color}" rx="2"/>`,
+      `<rect x="${legendX}" y="${legendY - 14}" width="18" height="18" fill="${s.color}" rx="3"/>`,
     );
     inner.push(
-      `<text x="${legendX + 22}" y="${legendY}" font-size="13" fill="${COLORS.fg}">${escape(s.label)}</text>`,
+      `<text x="${legendX + 26}" y="${legendY}" font-size="17" fill="${COLORS.fg}">${escape(s.label)}</text>`,
     );
-    legendX += 22 + s.label.length * 7.5 + 40;
+    legendX += legendEntryWidths[si];
   }
 
   return chartShell(cfg, inner.join("\n  "));
@@ -198,10 +204,10 @@ interface StyledTableArgs {
 
 function styledTable(args: StyledTableArgs): string {
   const padX = 50;
-  const padTop = 90;
-  const padBottom = 30;
-  const rowH = 44;
-  const headerH = 50;
+  const padTop = 130;
+  const padBottom = 40;
+  const rowH = 64;
+  const headerH = 70;
   const tableW = 1000;
   const innerW = tableW - padX * 2;
 
@@ -227,12 +233,12 @@ function styledTable(args: StyledTableArgs): string {
 
   // Header cells
   for (let c = 0; c < ncols; c++) {
-    const cellX = colXs[c] + 14;
-    const cellW = colWidths[c] - 28;
+    const cellX = colXs[c] + 18;
+    const cellW = colWidths[c] - 36;
     const textX = align[c] === "left" ? cellX : align[c] === "center" ? cellX + cellW / 2 : cellX + cellW;
     const anchor = align[c] === "left" ? "start" : align[c] === "center" ? "middle" : "end";
     inner.push(
-      `<text x="${textX}" y="${padTop + headerH / 2 + 5}" font-size="12" font-weight="600" fill="${COLORS.fg}" text-anchor="${anchor}" letter-spacing="0.04em" style="text-transform:uppercase;">${escape(args.headers[c])}</text>`,
+      `<text x="${textX}" y="${padTop + headerH / 2 + 6}" font-size="16" font-weight="700" fill="${COLORS.fg}" text-anchor="${anchor}" letter-spacing="0.04em" style="text-transform:uppercase;">${escape(args.headers[c])}</text>`,
     );
   }
 
@@ -252,14 +258,14 @@ function styledTable(args: StyledTableArgs): string {
       inner.push(`<line x1="${padX + 14}" y1="${y}" x2="${padX + innerW - 14}" y2="${y}" stroke="${COLORS.grid}" stroke-width="1"/>`);
     }
     for (let c = 0; c < ncols; c++) {
-      const cellX = colXs[c] + 14;
-      const cellW = colWidths[c] - 28;
+      const cellX = colXs[c] + 18;
+      const cellW = colWidths[c] - 36;
       const textX = align[c] === "left" ? cellX : align[c] === "center" ? cellX + cellW / 2 : cellX + cellW;
       const anchor = align[c] === "left" ? "start" : align[c] === "center" ? "middle" : "end";
-      const fontWeight = c === 0 ? "500" : "400";
+      const fontWeight = c === 0 ? "600" : "500";
       const color = c === 0 ? COLORS.fg : COLORS.fg;
       inner.push(
-        `<text x="${textX}" y="${y + rowH / 2 + 5}" font-size="13" font-weight="${fontWeight}" fill="${color}" text-anchor="${anchor}">${escape(row.cells[c])}</text>`,
+        `<text x="${textX}" y="${y + rowH / 2 + 7}" font-size="18" font-weight="${fontWeight}" fill="${color}" text-anchor="${anchor}">${escape(row.cells[c])}</text>`,
       );
     }
   }

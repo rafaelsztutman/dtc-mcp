@@ -9,60 +9,60 @@
 </head><body>
 <div class="wrap">
   <div class="label">Preview · Ablation full table</div>
-  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 434" width="1000" height="434">
-  <rect x="0" y="0" width="1000" height="434" fill="#F5F1EA"/>
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 624" width="1000" height="624">
+  <rect x="0" y="0" width="1000" height="624" fill="#F5F1EA"/>
   <style>text { font-family: -apple-system,BlinkMacSystemFont,Inter,'Segoe UI',sans-serif; }</style>
-  <text x="0" y="36" font-size="22" font-weight="600" fill="#2A1F18">Description ablation: full result table</text>
-  <text x="0" y="60" font-size="13" fill="#7A6B5F">5 description styles · 3 Sonnet sub-agent trials each · revenue-analysis scenario</text>
-  <rect x="50" y="90" width="900" height="50" fill="#E5DDD0" rx="6"/>
-  <text x="64" y="120" font-size="12" font-weight="600" fill="#2A1F18" text-anchor="start" letter-spacing="0.04em" style="text-transform:uppercase;">Candidate</text>
-  <text x="429.75" y="120" font-size="12" font-weight="600" fill="#2A1F18" text-anchor="end" letter-spacing="0.04em" style="text-transform:uppercase;">Stash</text>
-  <text x="542.25" y="120" font-size="12" font-weight="600" fill="#2A1F18" text-anchor="end" letter-spacing="0.04em" style="text-transform:uppercase;">Refed</text>
-  <text x="688.5" y="120" font-size="12" font-weight="600" fill="#2A1F18" text-anchor="end" letter-spacing="0.04em" style="text-transform:uppercase;">Calls/turn</text>
-  <text x="801" y="120" font-size="12" font-weight="600" fill="#2A1F18" text-anchor="end" letter-spacing="0.04em" style="text-transform:uppercase;">Hallucs</text>
-  <text x="936" y="120" font-size="12" font-weight="600" fill="#2A1F18" text-anchor="end" letter-spacing="0.04em" style="text-transform:uppercase;">Resp len</text>
-  <text x="64" y="167" font-size="13" font-weight="500" fill="#2A1F18" text-anchor="start">A — minimal (v1.0.4)</text>
-  <text x="429.75" y="167" font-size="13" font-weight="400" fill="#2A1F18" text-anchor="end">3/3</text>
-  <text x="542.25" y="167" font-size="13" font-weight="400" fill="#2A1F18" text-anchor="end">3/3</text>
-  <text x="688.5" y="167" font-size="13" font-weight="400" fill="#2A1F18" text-anchor="end">4.0</text>
-  <text x="801" y="167" font-size="13" font-weight="400" fill="#2A1F18" text-anchor="end">5</text>
-  <text x="936" y="167" font-size="13" font-weight="400" fill="#2A1F18" text-anchor="end">2034</text>
-  <line x1="64" y1="184" x2="936" y2="184" stroke="#E5DDD0" stroke-width="1"/>
-  <text x="64" y="211" font-size="13" font-weight="500" fill="#2A1F18" text-anchor="start">B — schema-first</text>
-  <text x="429.75" y="211" font-size="13" font-weight="400" fill="#2A1F18" text-anchor="end">3/3</text>
-  <text x="542.25" y="211" font-size="13" font-weight="400" fill="#2A1F18" text-anchor="end">3/3</text>
-  <text x="688.5" y="211" font-size="13" font-weight="400" fill="#2A1F18" text-anchor="end">2.0</text>
-  <text x="801" y="211" font-size="13" font-weight="400" fill="#2A1F18" text-anchor="end">3</text>
-  <text x="936" y="211" font-size="13" font-weight="400" fill="#2A1F18" text-anchor="end">1795</text>
-  <line x1="64" y1="228" x2="936" y2="228" stroke="#E5DDD0" stroke-width="1"/>
-  <text x="64" y="255" font-size="13" font-weight="500" fill="#2A1F18" text-anchor="start">C — example-first</text>
-  <text x="429.75" y="255" font-size="13" font-weight="400" fill="#2A1F18" text-anchor="end">3/3</text>
-  <text x="542.25" y="255" font-size="13" font-weight="400" fill="#2A1F18" text-anchor="end">3/3</text>
-  <text x="688.5" y="255" font-size="13" font-weight="400" fill="#2A1F18" text-anchor="end">3.3</text>
-  <text x="801" y="255" font-size="13" font-weight="400" fill="#2A1F18" text-anchor="end">1</text>
-  <text x="936" y="255" font-size="13" font-weight="400" fill="#2A1F18" text-anchor="end">1968</text>
-  <line x1="64" y1="272" x2="936" y2="272" stroke="#E5DDD0" stroke-width="1"/>
-  <text x="64" y="299" font-size="13" font-weight="500" fill="#2A1F18" text-anchor="start">D — ultra-compressed (35 tok)</text>
-  <text x="429.75" y="299" font-size="13" font-weight="400" fill="#2A1F18" text-anchor="end">3/3</text>
-  <text x="542.25" y="299" font-size="13" font-weight="400" fill="#2A1F18" text-anchor="end">3/3</text>
-  <text x="688.5" y="299" font-size="13" font-weight="400" fill="#2A1F18" text-anchor="end">3.3</text>
-  <text x="801" y="299" font-size="13" font-weight="400" fill="#2A1F18" text-anchor="end">5</text>
-  <text x="936" y="299" font-size="13" font-weight="400" fill="#2A1F18" text-anchor="end">2096</text>
-  <line x1="64" y1="316" x2="936" y2="316" stroke="#E5DDD0" stroke-width="1"/>
-  <text x="64" y="343" font-size="13" font-weight="500" fill="#2A1F18" text-anchor="start">E — hybrid (schema + example)</text>
-  <text x="429.75" y="343" font-size="13" font-weight="400" fill="#2A1F18" text-anchor="end">3/3</text>
-  <text x="542.25" y="343" font-size="13" font-weight="400" fill="#2A1F18" text-anchor="end">3/3</text>
-  <text x="688.5" y="343" font-size="13" font-weight="400" fill="#2A1F18" text-anchor="end">4.0</text>
-  <text x="801" y="343" font-size="13" font-weight="400" fill="#2A1F18" text-anchor="end">1</text>
-  <text x="936" y="343" font-size="13" font-weight="400" fill="#2A1F18" text-anchor="end">2349</text>
-  <rect x="50" y="360" width="900" height="44" fill="#7B9B6F" fill-opacity="0.15"/>
-  <line x1="64" y1="360" x2="936" y2="360" stroke="#E5DDD0" stroke-width="1"/>
-  <text x="64" y="387" font-size="13" font-weight="500" fill="#2A1F18" text-anchor="start">F — v1.0.6 design (canonical)</text>
-  <text x="429.75" y="387" font-size="13" font-weight="400" fill="#2A1F18" text-anchor="end">3/3</text>
-  <text x="542.25" y="387" font-size="13" font-weight="400" fill="#2A1F18" text-anchor="end">3/3</text>
-  <text x="688.5" y="387" font-size="13" font-weight="400" fill="#2A1F18" text-anchor="end">3.0</text>
-  <text x="801" y="387" font-size="13" font-weight="400" fill="#2A1F18" text-anchor="end">0</text>
-  <text x="936" y="387" font-size="13" font-weight="400" fill="#2A1F18" text-anchor="end">2121</text>
+  <text x="0" y="50" font-size="30" font-weight="700" fill="#2A1F18">Description ablation: full result table</text>
+  <text x="0" y="84" font-size="17" fill="#7A6B5F">5 description styles · 3 Sonnet sub-agent trials each · revenue-analysis scenario</text>
+  <rect x="50" y="130" width="900" height="70" fill="#E5DDD0" rx="6"/>
+  <text x="68" y="171" font-size="16" font-weight="700" fill="#2A1F18" text-anchor="start" letter-spacing="0.04em" style="text-transform:uppercase;">Candidate</text>
+  <text x="425.75" y="171" font-size="16" font-weight="700" fill="#2A1F18" text-anchor="end" letter-spacing="0.04em" style="text-transform:uppercase;">Stash</text>
+  <text x="538.25" y="171" font-size="16" font-weight="700" fill="#2A1F18" text-anchor="end" letter-spacing="0.04em" style="text-transform:uppercase;">Refed</text>
+  <text x="684.5" y="171" font-size="16" font-weight="700" fill="#2A1F18" text-anchor="end" letter-spacing="0.04em" style="text-transform:uppercase;">Calls/turn</text>
+  <text x="797" y="171" font-size="16" font-weight="700" fill="#2A1F18" text-anchor="end" letter-spacing="0.04em" style="text-transform:uppercase;">Hallucs</text>
+  <text x="932" y="171" font-size="16" font-weight="700" fill="#2A1F18" text-anchor="end" letter-spacing="0.04em" style="text-transform:uppercase;">Resp len</text>
+  <text x="68" y="239" font-size="18" font-weight="600" fill="#2A1F18" text-anchor="start">A — minimal (v1.0.4)</text>
+  <text x="425.75" y="239" font-size="18" font-weight="500" fill="#2A1F18" text-anchor="end">3/3</text>
+  <text x="538.25" y="239" font-size="18" font-weight="500" fill="#2A1F18" text-anchor="end">3/3</text>
+  <text x="684.5" y="239" font-size="18" font-weight="500" fill="#2A1F18" text-anchor="end">4.0</text>
+  <text x="797" y="239" font-size="18" font-weight="500" fill="#2A1F18" text-anchor="end">5</text>
+  <text x="932" y="239" font-size="18" font-weight="500" fill="#2A1F18" text-anchor="end">2034</text>
+  <line x1="64" y1="264" x2="936" y2="264" stroke="#E5DDD0" stroke-width="1"/>
+  <text x="68" y="303" font-size="18" font-weight="600" fill="#2A1F18" text-anchor="start">B — schema-first</text>
+  <text x="425.75" y="303" font-size="18" font-weight="500" fill="#2A1F18" text-anchor="end">3/3</text>
+  <text x="538.25" y="303" font-size="18" font-weight="500" fill="#2A1F18" text-anchor="end">3/3</text>
+  <text x="684.5" y="303" font-size="18" font-weight="500" fill="#2A1F18" text-anchor="end">2.0</text>
+  <text x="797" y="303" font-size="18" font-weight="500" fill="#2A1F18" text-anchor="end">3</text>
+  <text x="932" y="303" font-size="18" font-weight="500" fill="#2A1F18" text-anchor="end">1795</text>
+  <line x1="64" y1="328" x2="936" y2="328" stroke="#E5DDD0" stroke-width="1"/>
+  <text x="68" y="367" font-size="18" font-weight="600" fill="#2A1F18" text-anchor="start">C — example-first</text>
+  <text x="425.75" y="367" font-size="18" font-weight="500" fill="#2A1F18" text-anchor="end">3/3</text>
+  <text x="538.25" y="367" font-size="18" font-weight="500" fill="#2A1F18" text-anchor="end">3/3</text>
+  <text x="684.5" y="367" font-size="18" font-weight="500" fill="#2A1F18" text-anchor="end">3.3</text>
+  <text x="797" y="367" font-size="18" font-weight="500" fill="#2A1F18" text-anchor="end">1</text>
+  <text x="932" y="367" font-size="18" font-weight="500" fill="#2A1F18" text-anchor="end">1968</text>
+  <line x1="64" y1="392" x2="936" y2="392" stroke="#E5DDD0" stroke-width="1"/>
+  <text x="68" y="431" font-size="18" font-weight="600" fill="#2A1F18" text-anchor="start">D — ultra-compressed (35 tok)</text>
+  <text x="425.75" y="431" font-size="18" font-weight="500" fill="#2A1F18" text-anchor="end">3/3</text>
+  <text x="538.25" y="431" font-size="18" font-weight="500" fill="#2A1F18" text-anchor="end">3/3</text>
+  <text x="684.5" y="431" font-size="18" font-weight="500" fill="#2A1F18" text-anchor="end">3.3</text>
+  <text x="797" y="431" font-size="18" font-weight="500" fill="#2A1F18" text-anchor="end">5</text>
+  <text x="932" y="431" font-size="18" font-weight="500" fill="#2A1F18" text-anchor="end">2096</text>
+  <line x1="64" y1="456" x2="936" y2="456" stroke="#E5DDD0" stroke-width="1"/>
+  <text x="68" y="495" font-size="18" font-weight="600" fill="#2A1F18" text-anchor="start">E — hybrid (schema + example)</text>
+  <text x="425.75" y="495" font-size="18" font-weight="500" fill="#2A1F18" text-anchor="end">3/3</text>
+  <text x="538.25" y="495" font-size="18" font-weight="500" fill="#2A1F18" text-anchor="end">3/3</text>
+  <text x="684.5" y="495" font-size="18" font-weight="500" fill="#2A1F18" text-anchor="end">4.0</text>
+  <text x="797" y="495" font-size="18" font-weight="500" fill="#2A1F18" text-anchor="end">1</text>
+  <text x="932" y="495" font-size="18" font-weight="500" fill="#2A1F18" text-anchor="end">2349</text>
+  <rect x="50" y="520" width="900" height="64" fill="#7B9B6F" fill-opacity="0.15"/>
+  <line x1="64" y1="520" x2="936" y2="520" stroke="#E5DDD0" stroke-width="1"/>
+  <text x="68" y="559" font-size="18" font-weight="600" fill="#2A1F18" text-anchor="start">F — v1.0.6 design (canonical)</text>
+  <text x="425.75" y="559" font-size="18" font-weight="500" fill="#2A1F18" text-anchor="end">3/3</text>
+  <text x="538.25" y="559" font-size="18" font-weight="500" fill="#2A1F18" text-anchor="end">3/3</text>
+  <text x="684.5" y="559" font-size="18" font-weight="500" fill="#2A1F18" text-anchor="end">3.0</text>
+  <text x="797" y="559" font-size="18" font-weight="500" fill="#2A1F18" text-anchor="end">0</text>
+  <text x="932" y="559" font-size="18" font-weight="500" fill="#2A1F18" text-anchor="end">2121</text>
 </svg>
 </div>
 </body></html>
