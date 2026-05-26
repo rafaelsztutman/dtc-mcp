@@ -97,6 +97,78 @@ Two pieces of the v1.1.0 plan get reframed by these findings:
 
 The v1.1.0 plan's structure (intents metadata + recipe boost in search ranking) is unchanged; the *priority* of recipe-authoring goes UP because we now know examples are the only thing that teaches API surface effectively.
 
+## Round 3 — scenario variation + cost annotations + tool-name framing
+
+Run via `bench/runner/probe-round3.ts`. Three experiments, 30 sub-agent cells.
+
+### 3A: scenario variation (the methodology check)
+
+Tested F (v1.0.6 control) vs O (npm README) across 3 distinct scenarios that mirror the real bench's task categories:
+
+| Scenario | Cand | Hallc | Calls/T | Len | Dur |
+|---|---|---|---|---|---|
+| lookup (1 turn) | F | 1 | 1.0 | 422 | 18.9s |
+| lookup (1 turn) | O | **0** | 1.0 | **374** | **15.5s** |
+| revenue (3 turn) | F | 0 | 3.0 | **1990** | **38.3s** |
+| revenue (3 turn) | O | 0 | 3.0 | 2177 | 40.8s |
+| cross (3 turn) | F | **4** | 4.0 | 1771 | 43.2s |
+| cross (3 turn) | O | 2 | 4.0 | 2116 | 58.1s |
+
+**Findings:**
+
+- **F doesn't dominate across scenarios.** O is marginally better on lookup; F is marginally better on revenue; both struggle on cross-resource.
+- **Cross-resource breaks the canonical-example pattern.** Both F and O hallucinated on cross — the hallucinations (`klaviyo.getCampaigns`, `klaviyo.getSegments`) are flat-namespace patterns extrapolated from the example. The canonical example only shows ONE API surface (reporting); when the agent composes across resources, it makes up plausible-looking but wrong methods.
+- **This validates the v1.1.0 priority on recipes covering distinct resource shapes** — not more variants of the same shape.
+- **The lookup advantage of O over F is real but tiny** (~50 chars, ~3s). Doesn't justify additional churn.
+
+### 3B: cost annotations (inline metadata vs prescriptive prose)
+
+Tested F vs F_cost (F plus inline `// cost: X` comments in the canonical example):
+
+| Cand | Hallc | Calls/T | Len | Dur |
+|---|---|---|---|---|
+| F | 0 | 3.0 | 1990 | 38.3s |
+| F_cost | 0 | 3.0 | 1899 | 41.6s |
+
+**Wash.** Inline cost annotations produced 5% shorter responses but 9% slower duration. No accuracy change. **Hypothesis dead** — agents don't visibly weigh inline cost metadata, at least not in the comment-style format tested. This rules out the "maybe the cost-framing prose was right but in the wrong place" hypothesis from v1.0.6 design.
+
+### 3C: tool-name framing (does renaming change behavior?)
+
+Tested F's description under 4 alternative tool names:
+
+| Name | Hallc | Dur |
+|---|---|---|
+| execute_code | 0 | **38.3s** |
+| analyze | 0 | 51.2s |
+| klaviyo_query | 0 | 47.5s |
+| dtc | 0 | 52.4s |
+
+**`execute_code` is meaningfully fastest** — alternative names slow the agent down ~25%. Counter to my hypothesis (semantic-loaded names would help routing). Likely explanation: `execute_code` literally describes what the agent is doing (writing and executing JS), so there's no dissonance to resolve; renaming forces extra reasoning about whether the tool is appropriate.
+
+**Don't rename.** This rules out the "maybe a better name would prime better behavior" hypothesis.
+
+## Convergence across 3 rounds
+
+After 9 candidates across 3 rounds (~63 sub-agent probes), the description-design space has converged:
+
+1. **Stash behavior is description-independent** — Sonnet uses globalThis by default for multi-turn scenarios.
+2. **One canonical example with the real API surface does 99% of the teaching.**
+3. **Past that example, format is marginal** — schema, npm README, multi-example, anti-example, intent-routing, .d.ts all produce essentially equivalent behavior.
+4. **Cross-resource workloads break the canonical example.** The agent extrapolates patterns from one surface to others and invents methods. **Description-only can't fix this.**
+5. **Cost annotations don't help.** Inline cost metadata is neither absorbed nor weighed.
+6. **Tool names matter** — but counterintuitively. The literal `execute_code` outperforms semantic names by ~25% wall-clock.
+
+## What this means architecturally
+
+**The next leverage point is NOT description tweaks. It's runtime architecture.** Specifically:
+
+1. **Recipes covering distinct resource shapes** (v1.1.0 plan, priority confirmed).
+2. **Response-side teaching** that surfaces relevant recipes based on what the agent just ran.
+3. **Reactive tool surfaces** — tool descriptions that adapt to the prior call sequence.
+4. **Speculative result inclusion** — tool responses that carry likely follow-up data.
+
+None of these are description-level. The probe has earned its keep by showing us that the description has converged.
+
 ## Methodology notes
 
 This ablation is a model for future tool-design decisions. Pattern:
