@@ -1,0 +1,102 @@
+{
+  "version": "1.0.4",
+  "capturedAt": "2026-05-26T13:49:03.413Z",
+  "cells": {
+    "02-baseline-top-flow-revenue::dtc-mcp::trial-1": {
+      "tokens": 39191,
+      "durationMs": 30141,
+      "toolUses": 4,
+      "score": 0.9
+    },
+    "02-baseline-top-flow-revenue::dtc-mcp::trial-2": {
+      "tokens": 38059,
+      "durationMs": 41022,
+      "toolUses": 4,
+      "score": 1
+    },
+    "02-baseline-top-flow-revenue::klaviyo-mcp::trial-1": {
+      "tokens": 48210,
+      "durationMs": 34050,
+      "toolUses": 6,
+      "score": 1
+    },
+    "02-baseline-top-flow-revenue::klaviyo-mcp::trial-2": {
+      "tokens": 47831,
+      "durationMs": 45381,
+      "toolUses": 5,
+      "score": 0.9
+    },
+    "05-short-campaign-comparison::dtc-mcp::trial-1": {
+      "tokens": 43233,
+      "durationMs": 51123,
+      "toolUses": 6,
+      "score": 1
+    },
+    "05-short-campaign-comparison::dtc-mcp::trial-2": {
+      "tokens": 41735,
+      "durationMs": 49119,
+      "toolUses": 5,
+      "score": 1
+    },
+    "05-short-campaign-comparison::klaviyo-mcp::trial-1": {
+      "tokens": 48483,
+      "durationMs": 55422,
+      "toolUses": 6,
+      "score": 1
+    },
+    "05-short-campaign-comparison::klaviyo-mcp::trial-2": {
+      "tokens": 48941,
+      "durationMs": 67558,
+      "toolUses": 7,
+      "score": 1
+    },
+    "06-medium-campaign-performance-investigation::dtc-mcp::trial-1": {
+      "tokens": 44511,
+      "durationMs": 62890,
+      "toolUses": 7,
+      "score": 1
+    },
+    "06-medium-campaign-performance-investigation::dtc-mcp::trial-2": {
+      "tokens": 39932,
+      "durationMs": 35725,
+      "toolUses": 4,
+      "score": 1
+    },
+    "06-medium-campaign-performance-investigation::klaviyo-mcp::trial-1": {
+      "tokens": 58486,
+      "durationMs": 85762,
+      "toolUses": 6,
+      "score": 0.9
+    },
+    "06-medium-campaign-performance-investigation::klaviyo-mcp::trial-2": {
+      "tokens": 58890,
+      "durationMs": 77980,
+      "toolUses": 6,
+      "score": 0.9
+    },
+    "09-long-campaign-postmortem-and-strategy::dtc-mcp::trial-1": {
+      "tokens": 62075,
+      "durationMs": 179445,
+      "toolUses": 22,
+      "score": 1
+    },
+    "09-long-campaign-postmortem-and-strategy::dtc-mcp::trial-2": {
+      "tokens": 69363,
+      "durationMs": 199496,
+      "toolUses": 21,
+      "score": 1
+    },
+    "09-long-campaign-postmortem-and-strategy::klaviyo-mcp::trial-1": {
+      "tokens": 76228,
+      "durationMs": 103775,
+      "toolUses": 6,
+      "score": 1
+    },
+    "09-long-campaign-postmortem-and-strategy::klaviyo-mcp::trial-2": {
+      "tokens": 80696,
+      "durationMs": 146941,
+      "toolUses": 7,
+      "score": 1
+    }
+  }
+}
