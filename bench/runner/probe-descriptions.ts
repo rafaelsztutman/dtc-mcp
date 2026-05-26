@@ -93,7 +93,7 @@ globalThis.report = await klaviyo.reporting.flowValues({ data: { ... } });
 // next call: globalThis.report is still there`,
   },
   F: {
-    name: "Proposed v1.0.6 (schema + canonical example, real API surface)",
+    name: "v1.0.6 control (schema + 1 canonical example)",
     desc: `execute_code(code: string) -> { ok, result, stdout, state, durationMs }
   state: current globalThis stash (auto-populated, summary-form)
 
@@ -110,6 +110,161 @@ const report = await klaviyo.reporting.campaignValues({
 });
 globalThis.report = report;
 return topN(report.data.attributes.results, 3, r => r.statistics.conversion_value);`,
+  },
+  G: {
+    name: "Multi-example (4 worked examples)",
+    desc: `execute_code(code: string) -> { ok, result, stdout, state, durationMs }
+state: current globalThis stash (auto-populated).
+Globals: klaviyo, shopify, console, pick, topN, summarize, globalThis (persists across calls).
+
+// 1. List a resource (note JSON:API sort + filter syntax)
+return await klaviyo.campaigns.list({
+  filter: 'equals(messages.channel,"email")',
+  sort: '-scheduled_at',
+  'page[size]': '5',
+});
+
+// 2. Aggregated reporting (note nested JSON:API request envelope)
+const metricId = await klaviyo.getConversionMetricId();
+const report = await klaviyo.reporting.campaignValues({
+  data: { type: 'campaign-values-report', attributes: {
+    timeframe: { key: 'last_30_days' },
+    conversion_metric_id: metricId,
+    statistics: ['conversion_value'],
+  }}
+});
+globalThis.report = report;
+return topN(report.data.attributes.results, 3, r => r.statistics.conversion_value);
+
+// 3. Cross-turn reference (no re-fetch needed — state has report from prior call)
+return globalThis.report.data.attributes.results.map(r => r.groupings.campaign_id);
+
+// 4. Output discipline (avoid returning raw 100k payloads)
+return summarize(globalThis.report.data.attributes.results, { by: 'statistics.conversion_value', topN: 5 });`,
+  },
+  H: {
+    name: "Intent-routing decision tree (cognitive scaffold)",
+    desc: `execute_code(code: string) -> { ok, result, stdout, state, durationMs }
+
+INTENT ROUTING (use search_docs for details):
+  list resources         → klaviyo.X.list({...})
+  fetch by id            → klaviyo.X.get(id)
+  aggregated revenue/    → klaviyo.reporting.{campaignValues,flowValues}({
+    engagement metrics       data: { type, attributes: {timeframe, conversion_metric_id, statistics, ...}}})
+  cross-resource calc    → multi-statement code; stash intermediate results in globalThis
+  trim large response    → pick(value, schema) / topN(arr, n, by) / summarize(arr, opts)
+
+state field in response = current globalThis stash (auto-populated)
+Globals: klaviyo, shopify, console, pick, topN, summarize, globalThis (persists across calls).
+
+Reference example:
+const metricId = await klaviyo.getConversionMetricId();
+const report = await klaviyo.reporting.campaignValues({
+  data: { type: 'campaign-values-report', attributes: {
+    timeframe: { key: 'last_30_days' },
+    conversion_metric_id: metricId,
+    statistics: ['conversion_value'],
+  }}
+});
+globalThis.report = report;
+return topN(report.data.attributes.results, 3, r => r.statistics.conversion_value);`,
+  },
+  I: {
+    name: "Anti-example (correct + common hallucinations)",
+    desc: `execute_code(code: string) -> { ok, result, stdout, state, durationMs }
+state: current globalThis stash (auto-populated).
+Globals: klaviyo, shopify, console, pick, topN, summarize, globalThis (persists across calls).
+
+CORRECT (real API surface):
+  const metricId = await klaviyo.getConversionMetricId();
+  const report = await klaviyo.reporting.campaignValues({
+    data: { type: 'campaign-values-report', attributes: {
+      timeframe: { key: 'last_30_days' },
+      conversion_metric_id: metricId,
+      statistics: ['conversion_value'],
+    }}
+  });
+  globalThis.report = report;
+  return topN(report.data.attributes.results, 3, r => r.statistics.conversion_value);
+
+DON'T (common hallucinations — these methods/shapes do NOT exist):
+  klaviyo.campaigns.report({ start, end })          // wrong: no .report method
+  klaviyo.campaigns.valueReport({...})              // wrong: no .valueReport method
+  klaviyo.reporting.getCampaignValues({...})        // wrong: it's .campaignValues
+  klaviyo.metrics.getConversionMetricId()           // wrong: it's klaviyo.getConversionMetricId
+  klaviyo.reporting.campaignValues({ start, end })  // wrong: missing JSON:API envelope`,
+  },
+  K: {
+    name: "TypeScript .d.ts declaration file",
+    desc: `/**
+ * execute_code: run JS/TS in a stateful V8 sandbox (one context per MCP connection)
+ */
+declare function execute_code(code: string): Promise<{
+  ok: boolean
+  result?: unknown
+  error?: string
+  stdout: string[]
+  state: Record<string, string>  // globalThis stash summary (e.g. {"report": "Object(2 keys)"})
+  durationMs: number
+}>
+
+// Sandbox globals (TypeScript declarations for what's available inside the code):
+declare const klaviyo: {
+  getConversionMetricId(): Promise<string>
+  get(path: string, opts?: { params?: Record<string,string>, tier?: 'standard'|'reporting' }): Promise<JsonApiResponse>
+  post(path: string, body: object, opts?: { tier?: 'standard'|'reporting' }): Promise<JsonApiResponse>
+  paginate(path: string, opts?: object): Promise<{ items: JsonApiResource[], truncated: boolean }>
+  campaigns: { list(params?: object): Promise<JsonApiResponse>; get(id: string, params?: object): Promise<JsonApiResponse> }
+  flows:     { list(params?: object): Promise<JsonApiResponse>; get(id: string, params?: object): Promise<JsonApiResponse> }
+  reporting: {
+    campaignValues(req: { data: { type: 'campaign-values-report', attributes: ReportAttrs } }): Promise<ReportResponse>
+    flowValues(req:     { data: { type: 'flow-values-report',     attributes: ReportAttrs } }): Promise<ReportResponse>
+  }
+  // see search_docs for the rest of the surface (lists, segments, profiles, events, metrics)
+}
+declare const shopify: ShopifySDK
+declare function pick<T>(value: T, schema: object): T
+declare function topN<T>(arr: T[], n: number, by: string | ((t: T) => number)): T[]
+declare function summarize(arr, opts?: { by?, topN?, total?, stats? }): { count, top?, total?, avg?, min?, max? }
+// globalThis persists across execute_code calls in this MCP session`,
+  },
+  O: {
+    name: "npm package README markdown",
+    desc: `# execute_code
+
+Run JavaScript against typed Klaviyo + Shopify SDKs in a stateful V8 sandbox.
+
+## Usage
+
+\`\`\`js
+// Top 3 campaigns by revenue, last 30 days
+const metricId = await klaviyo.getConversionMetricId();
+const report = await klaviyo.reporting.campaignValues({
+  data: { type: 'campaign-values-report', attributes: {
+    timeframe: { key: 'last_30_days' },
+    conversion_metric_id: metricId,
+    statistics: ['conversion_value'],
+  }}
+});
+globalThis.report = report;
+return topN(report.data.attributes.results, 3, r => r.statistics.conversion_value);
+\`\`\`
+
+## Parameters
+
+- \`code\` (string): JS/TS to execute. Async. Return values via \`return ...\`.
+
+## Returns
+
+\`{ ok, result?, stdout, state, durationMs }\` — \`state\` is the current \`globalThis\` stash, auto-populated.
+
+## Sandbox globals
+
+\`klaviyo\`, \`shopify\`, \`console\`, \`pick\`, \`topN\`, \`summarize\`, \`globalThis\` (persists across calls in this session).
+
+## Discovery
+
+Use \`search_docs\` and \`read_doc\` for SDK paths and parameter shapes.`,
   },
 };
 

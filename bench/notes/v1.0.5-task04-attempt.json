@@ -1,0 +1,30 @@
+{
+  "version": "1.0.5",
+  "capturedAt": "2026-05-26T02:17:39.377Z",
+  "cells": {
+    "04-short-welcome-flow-deep-dive::dtc-mcp::trial-1": {
+      "tokens": 93409,
+      "durationMs": 137459,
+      "toolUses": 19,
+      "responseChars": 1565
+    },
+    "04-short-welcome-flow-deep-dive::dtc-mcp::trial-2": {
+      "tokens": 47138,
+      "durationMs": 58678,
+      "toolUses": 8,
+      "responseChars": 1372
+    },
+    "04-short-welcome-flow-deep-dive::klaviyo-mcp::trial-1": {
+      "tokens": 63398,
+      "durationMs": 96981,
+      "toolUses": 9,
+      "responseChars": 1652
+    },
+    "04-short-welcome-flow-deep-dive::klaviyo-mcp::trial-2": {
+      "tokens": 60232,
+      "durationMs": 85197,
+      "toolUses": 9,
+      "responseChars": 1707
+    }
+  }
+}

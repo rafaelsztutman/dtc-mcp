@@ -222,7 +222,7 @@ Do not set both auth modes at once; the server logs a warning and uses Client Cr
 npm install        # installs deps, builds isolated-vm via node-gyp
 npm run build      # tsc → dist/
 npm run dev        # tsc --watch
-npm test           # vitest (53 tests)
+npm test           # vitest (63 tests)
 npm run inspect    # MCP Inspector — connect any client to dist/index.js
 ```
 
@@ -243,6 +243,21 @@ npm run codegen:docs      # merge guides + chunks into data/docs.json
 ```
 
 In production this runs daily on a GitHub Action in [dtc-mcp-docs](https://github.com/rafaelsztutman/dtc-mcp-docs); the MCP fetches the freshest copy on the next boot.
+
+---
+
+## Benchmark & design notes
+
+`bench/` contains a head-to-head benchmark against Klaviyo's official MCP server (9 analytics tasks × both MCPs × 2 trials, judged by Sonnet sub-agents) plus the internal findings that drove the v1.0.5 → v1.0.6 evolution.
+
+Worth reading if you're building MCPs of your own:
+
+- `bench/notes/findings.md` — seven lessons about how LLMs use MCPs, grounded in specific bench cells. Includes the v1.0.5 regression and how the v1.0.6 LLM-native-description fix recovered it.
+- `bench/notes/description-ablation.md` — three rounds of Sonnet sub-agent probes (~63 trials) on candidate tool descriptions. Establishes that one canonical real-API example does ~99% of the teaching; format past that is marginal; prescriptive prose is dead weight.
+- `bench/notes/prior-art.md` — survey of the prior art on code-execution MCPs (Anthropic Code-Execution MCP, Cloudflare Code Mode, CodeAct, smolagents, BFCL v3, τ²-bench) and how it maps to what we observed.
+- `bench/notes/v1.1.0-plan.md` — recipe-by-intent discovery, the next leverage point.
+
+The benchmark harness itself (`bench/runner/`) is reusable. The Sonnet sub-agent probe pattern (`bench/runner/probe-descriptions.ts` + `probe-round3.ts`) takes ~5 min and ~$0 to ablate any tool-description change — recommended before committing changes that affect agent behavior.
 
 ---
 
