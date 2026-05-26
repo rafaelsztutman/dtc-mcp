@@ -128,6 +128,41 @@ Things that look like fixes but would over-tune dtc-mcp for the bench and bake i
 
 ---
 
+## v1.0.6 reset (added 2026-05-25 post-publish)
+
+**v1.0.5 was reverted. v1.0.6 replaces it.** Sequence of events:
+
+1. v1.0.5 shipped with a "STRONGLY RECOMMENDED" prescriptive paragraph in the `execute_code` tool description. Predicted to reduce dtc-mcp tokens on multi-turn tasks by teaching the stash-and-cite pattern.
+2. v1.0.5 re-bench started. **Task 04 dtc trial-1 jumped from 49k tokens (v1.0.4) to 93k (v1.0.5).** Task 08 timed out at 20 min wall-clock (vs 7.3 min on v1.0.4).
+3. Suspected the prescriptive description was inducing over-engineering. User insight: "you're an LLM consuming this; we keep articulating tools that are easier for humans to understand, but the LLM has different needs."
+4. **Ran an ablation experiment** (`bench/notes/description-ablation.md`): 5 candidate description styles × 3 Sonnet sub-agent trials each, scenario chosen to exercise stash behavior, NO Klaviyo API calls. Pure description-effects measurement.
+5. **Three findings shifted the architecture:**
+   - **Stash behavior is description-independent.** Every candidate scored 3/3 on both stashing in turn 1 AND referencing from stash in turn 2/3, including the ultra-compressed 35-token candidate. Sonnet figures out the pattern from the scenario, not the description. v1.0.5's prose was teaching behavior the model already had.
+   - **One concrete real-API example is the single most effective teaching surface.** Candidates with an example hallucinated 1/3 trials; candidates without examples hallucinated 5/3. 5× difference from one example.
+   - **Prescriptive language has zero behavioral lift and real token cost.** Adding "STRONGLY RECOMMENDED" doesn't change attention weighting — it just adds context.
+6. **Designed candidate F** (schema + one canonical real-API example + globals listing, no prose). Re-ran the ablation including F. **F scored 0 hallucinations across 3 trials, 3/3 on stash behavior, 2113 chars response length.** Best-of-class.
+7. v1.0.6 ships F as the new `execute_code` description, adds a `state` field to the response envelope (auto-populated from `globals()`, so the agent can see what's stashed without an explicit call), reverts v1.0.5's prose additions completely.
+
+**Specific changes — see commit `<TBD>`:**
+
+- `src/tools/execute_code.ts` — description fully replaced with the F shape. No "STRONGLY RECOMMENDED", no cost framing in prose, no imperative instructions. One canonical example using the real `klaviyo.reporting.campaignValues` API surface and the real `klaviyo.getConversionMetricId()` method — those two corrections in the example were where most v1.0.5 hallucinations came from.
+- `src/sandbox/runner.ts` + `vm-runner.ts` + `sidecar-runner.ts` + `sidecar/index.ts` + `protocol.ts` — `state: Record<string, string>` flows from the sandbox through the runner to the tool response. The wrapper script calls `globals()` post-execution and includes the result alongside `result`/`stdout`.
+- `bench/notes/description-ablation.md` — full writeup of the experiment, including the runner (`bench/runner/probe-descriptions.ts`) so future tool-design decisions can use the same probe methodology.
+- `bench/notes/v1.0.4-baseline-04-08.json` — preserved.
+
+**The cross-cutting lesson** (Lesson 8 — adding to the list above):
+> **Tool descriptions are LLM input, not human documentation.** Optimize for what the model parses structurally (schema, names, response shapes, concrete examples), not for what a human reader finds helpful (prescriptive guidance, motivational framing, cost storytelling). Validate description changes via sub-agent ablation BEFORE shipping — the cost is ~5 min and prevents a v1.0.5-style regression.
+
+**Re-bench scope (unchanged from v1.0.5 plan):** same 8 cells from tasks 04 + 08. Already reset in `state.json`. v1.0.4 baseline still in `bench/notes/v1.0.4-baseline-04-08.json`. Run after Claude Max quota refreshes.
+
+**Falsification criteria for v1.0.6:**
+- If task 04 dtc tokens come in BELOW v1.0.5 (which was 70k mean): v1.0.6 fixed the regression.
+- If task 08 dtc completes within 10 min wall-clock and tokens drop toward klv parity (~103k): v1.0.6 delivered the original v1.0.5 goal.
+- If task 04 dtc tokens AT v1.0.4 levels (~55k) and task 08 dtc at ~110k: v1.0.6 = parity recovery. Defensible: we removed a regression and learned a transferable lesson.
+- If task 08 STILL exceeds 10 min: the description isn't the bottleneck; problem is somewhere else (sandbox per-call overhead, Klaviyo throttling at scale).
+
+---
+
 ## v1.0.5 status (added 2026-05-25 post-publish)
 
 **Shipped.** v1.0.5 published to npm on 2026-05-25, addresses backlog item #1 (stash-and-cite ergonomics).

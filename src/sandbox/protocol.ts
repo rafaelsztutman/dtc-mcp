@@ -71,6 +71,9 @@ export interface ExecuteResponseMessage {
   /** JSON-encoded user return value, only meaningful when ok=true. */
   resultJson?: string;
   stdout: string[];
+  /** Post-execution snapshot of user-added globalThis keys (summary form).
+   * Computed via the in-sandbox `globals()` helper. Empty when nothing stashed. */
+  state?: Record<string, string>;
   error?: string;
   durationMs: number;
   /** True when the underlying isolate was recreated since the last call. */

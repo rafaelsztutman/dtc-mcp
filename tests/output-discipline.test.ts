@@ -147,6 +147,26 @@ describe("sandbox helpers: globals", () => {
     });
   });
 
+  it("auto-populates the state field on RunResult after each call", async () => {
+    const { runSandbox } = await import("../src/sandbox/runner.js");
+    const r = await runSandbox(
+      `
+        globalThis.v106report = { results: [1,2,3] };
+        globalThis.v106metricId = 'abc123';
+        return globalThis.v106report.results.length;
+      `,
+      { timeoutMs: 5_000 },
+    );
+    expect(r.ok).toBe(true);
+    expect(r.result).toBe(3);
+    // Session state from prior tests may also be present; assert the keys
+    // this test created are reflected with the right summary shape.
+    expect(r.state).toMatchObject({
+      v106report: "Object(1 keys)",
+      v106metricId: '"abc123"',
+    });
+  });
+
   it("hides built-in helpers and SDK namespaces from the listing", async () => {
     const { runSandbox } = await import("../src/sandbox/runner.js");
     const r = await runSandbox(`return globals();`, { timeoutMs: 5_000 });

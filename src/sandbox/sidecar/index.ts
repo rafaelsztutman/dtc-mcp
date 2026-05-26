@@ -256,6 +256,7 @@ ${msg.code}
   return JSON.stringify({
     result: __result === undefined ? null : __result,
     stdout: __getStdout(),
+    state: typeof globalThis.globals === 'function' ? globalThis.globals() : {},
   });
 })();
 `;
@@ -268,6 +269,7 @@ ${msg.code}
     const parsed = JSON.parse(resultJson) as {
       result: unknown;
       stdout: string[];
+      state?: Record<string, string>;
     };
 
     send({
@@ -276,6 +278,7 @@ ${msg.code}
       ok: true,
       resultJson: JSON.stringify(parsed.result ?? null),
       stdout: parsed.stdout,
+      state: parsed.state ?? {},
       durationMs: Date.now() - start,
       ...(wasReset ? { sessionReset: true } : {}),
     });

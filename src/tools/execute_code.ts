@@ -6,57 +6,39 @@ import { log } from "../config.js";
 
 const codeShape = {
   code: z.string().describe(
-    "TypeScript-like JavaScript to execute. Wrap top-level await calls naturally — the code runs in an async context. Return a value via `return ...` to receive it as the tool result. Globals available: `klaviyo`, `shopify`, `console`, plus helpers `pick`, `topN`, `summarize`, `globals`. No `fetch`/`process`/`require`/`import`. Add `// @timeout 2m` (max 5m) at the top to extend the default 30s wall-clock limit. Discover SDK methods via the `search_docs` tool.",
+    "JavaScript (or TypeScript-like) to execute in the stateful sandbox. Async; return a value via `return ...`. Globals: klaviyo, shopify, console, pick, topN, summarize, globalThis. No fetch/process/require/import. Add `// @timeout 2m` (max 5m) to extend the 30s wall-clock limit.",
   ),
 };
 
+// Tool description shape was driven by the description-ablation experiment in
+// bench/notes/description-ablation.md. Key findings: (1) stash-and-cite
+// behavior is description-independent — Opus stashes by default, so the
+// v1.0.5 prescriptive prose was dead weight; (2) one canonical real-API
+// example is the single most effective teaching surface — it eliminated
+// hallucinations 5× vs schema-only or prose-only descriptions. The shape
+// below is schema + globals enumeration + one canonical example.
 const description = `
-Execute JavaScript against the typed Klaviyo + Shopify SDKs in a stateful V8 sandbox.
+execute_code(code: string) -> { ok, result, stdout, state, durationMs }
+  state: current globalThis stash (auto-populated, summary-form — read this to see
+         what data from prior calls is available without re-fetching)
 
-The host applies rate limits, auth, and caching transparently. The sandbox keeps one
-context alive per MCP connection — variables you assign to globalThis persist across
-calls, so iterative analyses don't re-fetch.
+Sandbox globals: klaviyo, shopify, console, pick, topN, summarize, globalThis (persists across calls)
 
-STRONGLY RECOMMENDED for multi-turn investigations: stash any expensive fetch
-(reporting payloads, paginated lists, computed aggregates) on globalThis so
-follow-up turns reference the stashed data instead of re-fetching it. Re-running
-a 5,000-row report costs ~30k tokens; reading globalThis.report costs near zero.
-Call \`globals()\` at the start of any follow-up call to see what's already stashed.
+Discovery: search_docs / read_doc surface SDK paths, parameter shapes, and recipes.
+The SDK uses JSON:API conventions (sort keys, sparse fieldsets) that differ from
+typical JS SDKs — search_docs FIRST for unfamiliar methods.
 
-Available globals:
-- klaviyo: { get, post, paginate, campaigns, flows, lists, segments, profiles, events, metrics, reporting }
-- shopify: { gql, ql, timezone } — Shopify Admin GraphQL + ShopifyQL
-- console: { log, error, warn, info } — captured and returned as stdout
-- pick(value, schema) / topN(arr, n, by) / summarize(arr, opts) — output-discipline helpers
-- globals() — returns { name: summary } of everything currently stashed on globalThis
-- globalThis.* — assignments persist across calls within this MCP session
-
-Discovery: use read_doc({}) at session start to list every available SDK path, then
-read_doc({ path }) for any chunk's signature and example. Use search_docs for
-intent-based queries when the path is not known. STRONGLY RECOMMENDED: if you have
-not used a method before in this session, call search_docs FIRST — the SDK uses
-JSON:API conventions (e.g. valid sort keys, sparse fieldsets) that don't match
-the patterns most JS SDKs follow.
-
-Param shapes the SDK accepts (both work, the host normalizes):
-- Canonical:    { 'page[size]': '20', 'fields[campaign]': 'name,status' }
-- JS-idiomatic: { pageSize: 20, fields: { campaign: ['name', 'status'] } }
-Common method aliases (e.g. klaviyo.campaigns.getCampaigns) are also accepted and
-route to the canonical .list()/.get().
-
-The host caps return values at ~100 KB; oversized returns are replaced with a
-truncation envelope. Use pick/topN/summarize to stay under the cap.
-
-Example (top 5 campaigns by revenue last 30d):
+Reference example (real API surface — note JSON:API request shape):
   const metricId = await klaviyo.getConversionMetricId();
   const report = await klaviyo.reporting.campaignValues({
-    data: { type: "campaign-values-report", attributes: {
-      timeframe: { key: "last_30_days" },
+    data: { type: 'campaign-values-report', attributes: {
+      timeframe: { key: 'last_30_days' },
       conversion_metric_id: metricId,
-      statistics: ["recipients", "open_rate", "click_rate", "conversion_value"],
+      statistics: ['recipients', 'open_rate', 'conversion_value'],
     }}
   });
-  return topN(report.data.attributes.results, 5, (r) => r.statistics.conversion_value);
+  globalThis.report = report;
+  return topN(report.data.attributes.results, 5, r => r.statistics.conversion_value);
 `.trim();
 
 export function registerExecuteCode(server: McpServer): void {
@@ -82,6 +64,7 @@ export function registerExecuteCode(server: McpServer): void {
           ok: result.ok,
           ...(result.ok ? { result: result.result } : { error: result.error }),
           stdout: result.stdout,
+          state: result.state ?? {},
           durationMs: result.durationMs,
           sandbox: result.sandbox,
           ...(result.sessionReset

@@ -194,6 +194,7 @@ class SidecarProcess {
         ok: true,
         result,
         stdout: msg.stdout,
+        state: msg.state ?? {},
         durationMs: msg.durationMs,
         ...(msg.sessionReset ? { sessionReset: true } : {}),
       });
@@ -202,6 +203,7 @@ class SidecarProcess {
         ok: false,
         error: msg.error ?? "unknown error",
         stdout: msg.stdout ?? [],
+        state: msg.state ?? {},
         durationMs: msg.durationMs,
         ...(msg.sessionReset ? { sessionReset: true } : {}),
       });

@@ -1,5 +1,6 @@
 node_modules/
 *.tsbuildinfo
+notes/probe-results/
 
 # All per-run artifacts. The bench runs against a real Klaviyo account, so
 # state.json / raw.jsonl contain real campaign IDs, flow names, etc. — not

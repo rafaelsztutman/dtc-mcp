@@ -32,6 +32,11 @@ export interface RunResult {
   stdout: string[];
   error?: string;
   durationMs: number;
+  /** Current globalThis stash summary (post-execution snapshot). Maps user-added
+   * global names → short type summaries (e.g. "Array(5000)", "Object(2 keys)").
+   * Empty object when nothing is stashed. Auto-populated; agent can read it
+   * from the response to see what data is available for the next call. */
+  state?: Record<string, string>;
   /** True when the underlying context was recreated since the last call. */
   sessionReset?: boolean;
 }
@@ -159,6 +164,7 @@ ${transformIfTs(code)}
   return JSON.stringify({
     result: __result === undefined ? null : __result,
     stdout: __getStdout(),
+    state: typeof globalThis.globals === 'function' ? globalThis.globals() : {},
   });
 })();`;
 
@@ -206,11 +212,13 @@ ${transformIfTs(code)}
     const parsed = JSON.parse(resultJson) as {
       result: unknown;
       stdout: string[];
+      state?: Record<string, string>;
     };
     return {
       ok: true,
       result: parsed.result,
       stdout: parsed.stdout,
+      state: parsed.state ?? {},
       durationMs: Date.now() - start,
       ...(wasReset ? { sessionReset: true } : {}),
     };
